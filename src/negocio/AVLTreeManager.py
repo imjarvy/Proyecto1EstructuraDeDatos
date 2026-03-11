@@ -2,16 +2,17 @@
 AVLTreeManager – Business logic layer for the SkyBalance AVL Flight Management System.
 
 Provides high-level operations on an AVLTree:
-  - add_flight      : validate and insert a new FlightNode.
-  - delete_flight   : remove a flight from the tree by code.
-  - update_flight   : modify one or more fields of an existing flight.
-  - cancel_flight   : mark a flight as CANCELLED (sets alert and zeroes passengers).
+    - add_flight      : validate and insert a new FlightNode.
+    - delete_flight   : remove a flight from the tree by code.
+    - update_flight   : modify one or more fields of an existing flight.
+    - cancel_flight   : remove a flight and its full descendant subtree.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from src.modelos.AVLTree import AVLTree
 from src.modelos.FlightNode import FlightNode
+from src.acceso_datos.DataPersistence import DataPersistence
 
 
 # Fields that can be updated without changing the BST key (flight_code).
@@ -25,9 +26,6 @@ _UPDATABLE_FIELDS = {
     "alert",
     "priority",
 }
-
-CANCELLED_ALERT = "CANCELLED"
-
 
 class AVLTreeManager:
     """
@@ -46,6 +44,54 @@ class AVLTreeManager:
                                       empty tree when not provided.
         """
         self.tree: AVLTree = tree if tree is not None else AVLTree()
+        self._persistence = DataPersistence()
+        self._undo_stack: List[Dict[str, Any]] = []
+        
+
+    # PILA DE DESHACER (Crtl+Z)
+    
+    def _snapshot_state(self) -> Dict[str, Any]:
+        """Capture full reversible AVL state for Ctrl+Z operations."""
+        return {
+            "tree_data": self._persistence.serialize_tree_for_storage(self.tree.root),
+            "rotation_count": self.tree.rotation_count.copy(),
+            "cascade_rebalance_count": self.tree.cascade_rebalance_count,
+            "stress_mode": self.tree.stress_mode,
+        }
+
+    def _push_undo_state(self) -> None:
+        """Store current state so next mutating operation can be reverted."""
+        self._undo_stack.append(self._snapshot_state())
+
+    def can_undo(self) -> bool:
+        """Return True when at least one previous state is available."""
+        return len(self._undo_stack) > 0
+
+    def undo_last_action(self) -> bool:
+        """
+        Revert the tree to the state before the last mutating action.
+
+        Returns:
+            bool: True if an action was undone, False if history is empty.
+        """
+        if not self._undo_stack:
+            return False
+
+        snapshot = self._undo_stack.pop()
+        tree_data = snapshot.get("tree_data")
+
+        if tree_data is None:
+            self.tree.root = None
+        else:
+            restored_root = self._persistence.deserialize_tree_from_dict(tree_data)
+            self.tree.root = restored_root
+
+        self.tree.rotation_count = snapshot.get("rotation_count", self.tree.rotation_count.copy())
+        self.tree.cascade_rebalance_count = int(
+            snapshot.get("cascade_rebalance_count", self.tree.cascade_rebalance_count)
+        )
+        self.tree.stress_mode = bool(snapshot.get("stress_mode", self.tree.stress_mode))
+        return True
 
     def set_stress_mode(
         self,
@@ -137,6 +183,7 @@ class AVLTreeManager:
         )
         node.final_price = self._compute_final_price(base_price, promotion)
 
+        self._push_undo_state()
         self.tree.insert(node)
         return node
 
@@ -164,6 +211,7 @@ class AVLTreeManager:
         if self.tree.root is None or self.tree.search(code) is None:
             raise KeyError(f"Flight '{code}' not found in the tree.")
 
+        self._push_undo_state()
         return self.tree.delete(code)
 
     # -----------------------------------------------------------------------
@@ -235,6 +283,8 @@ class AVLTreeManager:
             self._validate_origin_destination(fields["origin"], fields["destination"])
 
         # ---- apply non-key field changes -----------------------------------
+        self._push_undo_state()
+
         if "origin" in fields:
             node.origin = fields["origin"].strip()
         if "destination" in fields:
@@ -284,36 +334,30 @@ class AVLTreeManager:
     # CANCEL
     # -----------------------------------------------------------------------
 
-    def cancel_flight(self, flight_code: str) -> FlightNode:
+    def cancel_flight(self, flight_code: str) -> int:
         """
-        Mark a flight as cancelled.
+        Cancel a flight by removing its entire subtree.
 
-        Sets the node's ``alert`` to ``'CANCELLED'`` and resets
-        ``passengers`` to 0.  The node remains in the tree so that the
-        history of the flight is preserved.
+        Cancellation differs from single-node deletion: this operation removes
+        the matching node and all of its descendants, then triggers AVL
+        rebalancing from the detached subtree parent.
 
         Args:
             flight_code (str): Code of the flight to cancel.
 
         Returns:
-            FlightNode: The updated node.
+            int: Number of removed nodes.
 
         Raises:
             ValueError: If flight_code is blank.
             KeyError:   If the flight is not found.
-            RuntimeError: If the flight is already cancelled.
         """
         self._validate_flight_code(flight_code)
         code = flight_code.strip().upper()
 
-        node = self._require_node(code)
-
-        if node.alert == CANCELLED_ALERT:
-            raise RuntimeError(f"Flight '{code}' is already cancelled.")
-
-        node.alert = CANCELLED_ALERT
-        node.passengers = 0
-        return node
+        self._require_node(code)
+        self._push_undo_state()
+        return self.tree.delete_subtree(code)
 
     # -----------------------------------------------------------------------
     # HELPERS

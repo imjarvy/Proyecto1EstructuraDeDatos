@@ -478,6 +478,58 @@ class AVLTree:
             self._delete_one_child_node(node)
         elif deletion_case == 3:
             self._delete_two_child_node(node)
+
+    def delete_subtree(self, flight_code: str) -> int:
+        """
+        Delete a node and its entire descendant subtree.
+
+        This operation is used for flight cancellation rules where the selected
+        flight and all dependent flights below it must be removed together.
+
+        Args:
+            flight_code (str): Root code of the subtree to remove.
+
+        Returns:
+            int: Number of removed nodes (0 when code is not found).
+        """
+        if self.root is None:
+            print("Tree is empty.")
+            return 0
+
+        target = self.search(flight_code)
+        if target is None:
+            print(f"Flight {flight_code} not found in tree.")
+            return 0
+
+        removed_count = self._count_subtree_nodes(target)
+        parent = target.parent
+
+        if parent is None:
+            self.root = None
+        else:
+            if parent.left is target:
+                parent.left = None
+            else:
+                parent.right = None
+            self._check_balance(parent)
+
+        target.parent = None
+        return removed_count
+
+    def _count_subtree_nodes(self, node: Optional[FlightNode]) -> int:
+        """
+        Count total nodes in a subtree.
+
+        Args:
+            node (FlightNode): Subtree root.
+
+        Returns:
+            int: Number of nodes in the subtree.
+        """
+        if node is None:
+            return 0
+
+        return 1 + self._count_subtree_nodes(node.left) + self._count_subtree_nodes(node.right)
     
     def _identify_deletion_case(self, node: FlightNode) -> int:
         """
