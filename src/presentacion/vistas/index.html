@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyBalance AVL - Sistema de Gestión Aérea</title>
+    <link rel="stylesheet" href="../estilos/styles.css">
+</head>
+<body>
+    <header>
+        <h1>SkyBalance AVL</h1>
+        <h2>Sistema de Gestión Aérea</h2>
+        <div id="headerButtons">
+            <button id="loadJsonBtn">Cargar JSON</button>
+            <button id="exportTreeBtn">Exportar JSON</button>
+            <button id="stressModeBtn">Activar Modo Estrés</button>
+            <button id="globalRebalanceBtn">Rebalanceo Global</button>
+            <button id="undoBtn" disabled>↩ Deshacer</button>
+            <button id="deleteLeastProfitable">Eliminar Menor Rentabilidad</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Tree visualisation -->
+        <section id="treeSection">
+            <h3>Visualización del Árbol AVL</h3>
+            <div id="treeContainer">
+                <svg id="treeSvg"></svg>
+            </div>
+        </section>
+
+        <!-- Tree properties -->
+        <section id="propertiesSection">
+            <h3>Propiedades del Árbol</h3>
+            <div id="properties">
+                <p><strong>Raíz:</strong>              <span id="rootValue">-</span></p>
+                <p><strong>Altura:</strong>             <span id="heightValue">0</span></p>
+                <p><strong>Hojas:</strong>              <span id="leavesValue">0</span></p>
+                <p><strong>Nodos:</strong>              <span id="nodesValue">0</span></p>
+                <p><strong>Rotaciones Totales:</strong> <span id="rotationsValue">0</span></p>
+            </div>
+        </section>
+
+        <!-- Flight CRUD form -->
+        <section id="controlsSection">
+            <h3>Gestión de Vuelos</h3>
+            <div id="flightForm">
+                <input type="text"   id="flightCode"   placeholder="Código de Vuelo" required>
+                <input type="text"   id="origin"        placeholder="Origen"          required>
+                <input type="text"   id="destination"   placeholder="Destino"         required>
+                <input type="number" id="basePrice"     placeholder="Precio Base"     step="0.01" required>
+                <input type="number" id="passengers"    placeholder="Pasajeros"       value="0">
+                <input type="number" id="promotion"     placeholder="Promoción"       step="0.01" value="0">
+                <input type="text"   id="alert"         placeholder="Alerta">
+                <select id="priority">
+                    <option value="1">1 - Baja</option>
+                    <option value="2">2</option>
+                    <option value="3" selected>3 - Media</option>
+                    <option value="4">4</option>
+                    <option value="5">5 - Alta</option>
+                </select>
+                <button id="addFlightBtn">Agregar Vuelo</button>
+                <button id="editFlightBtn"   disabled>Editar Vuelo</button>
+                <button id="deleteFlightBtn" disabled>Eliminar Vuelo</button>
+                <button id="cancelFlightBtn" disabled>Cancelar Vuelo</button>
+            </div>
+        </section>
+
+        <!-- Analytical metrics -->
+        <section id="metricsSection">
+            <h3>Métricas Analíticas</h3>
+            <div id="metrics">
+                <p><strong>Altura Actual:</strong>           <span id="currentHeight">0</span></p>
+                <p><strong>Rotaciones LL:</strong>           <span id="llRotations">0</span></p>
+                <p><strong>Rotaciones RR:</strong>           <span id="rrRotations">0</span></p>
+                <p><strong>Rotaciones LR:</strong>           <span id="lrRotations">0</span></p>
+                <p><strong>Rotaciones RL:</strong>           <span id="rlRotations">0</span></p>
+                <p><strong>Cancelaciones Masivas:</strong>   <span id="massCancellations">0</span></p>
+                <p><strong>Recorrido en Anchura:</strong>    <span id="breadthTraversal">-</span></p>
+                <p><strong>Recorrido en Profundidad:</strong><span id="depthTraversal">-</span></p>
+            </div>
+        </section>
+
+        <!-- Critical depth / penalisation -->
+        <section id="penalizationSection">
+            <h3>Sistema de Penalización</h3>
+            <label for="criticalDepth">Profundidad Crítica:</label>
+            <input  type="number" id="criticalDepth" value="5" min="1">
+            <button id="updateCriticalDepthBtn">Actualizar</button>
+        </section>
+    </main>
+
+    <!-- ===== MODALS ===== -->
+
+    <!-- Load JSON modal -->
+    <div id="jsonModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Cargar Archivo JSON</h3>
+            <select id="loadType">
+                <option value="topology">Topología</option>
+                <option value="insertion">Inserción</option>
+            </select>
+            <input  type="file" id="jsonFile" accept=".json">
+            <button id="loadJsonConfirmBtn">Cargar</button>
+        </div>
+    </div>
+
+    <!-- Versions modal -->
+    <div id="versionsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Gestión de Versiones</h3>
+            <input  type="text" id="versionName" placeholder="Nombre de la Versión">
+            <button id="saveVersionBtn">Guardar Versión</button>
+            <button id="showVersionsBtn">Ver Versiones</button>
+            <ul id="versionsList"></ul>
+        </div>
+    </div>
+
+    <!-- AVL audit modal -->
+    <div id="auditModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Reporte de Auditoría AVL</h3>
+            <!-- Audit button only shown in stress mode (spec §7) -->
+            <button id="auditAvlBtn" style="display:none;">Verificar Propiedad AVL</button>
+            <div id="auditReport"></div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- type="module" required for the ES-module import of StorageManager -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
