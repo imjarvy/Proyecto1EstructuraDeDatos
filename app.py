@@ -179,6 +179,95 @@ def export_tree():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# POST /api/insert
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/insert", methods=["POST"])
+def insert_flight():
+    """
+    Inserta un vuelo nuevo en el árbol AVL.
+
+    Request body (JSON):
+    {
+        "flight_code": "SK010",
+        "origin":      "Bogotá",
+        "destination": "Cali",
+        "base_price":  180000,
+        "passengers":  0,
+        "promotion":   0,
+        "alert":       "",
+        "priority":    3
+    }
+    """
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({"error": "El cuerpo debe ser JSON."}), 400
+
+    required = ["flight_code", "origin", "destination", "base_price"]
+    missing  = [f for f in required if f not in body]
+    if missing:
+        return jsonify({"error": f"Faltan campos: {', '.join(missing)}"}), 400
+
+    # Verificar que el vuelo no exista ya
+    try:
+        existing = avl_tree.search(body["flight_code"])
+        if existing:
+            return jsonify({"error": f"El vuelo '{body['flight_code']}' ya existe en el árbol."}), 409
+    except Exception:
+        pass  # search lanza excepción si el árbol está vacío, lo cual es válido
+
+    try:
+        from src.modelos.FlightNode import FlightNode
+        new_node = FlightNode.from_dict({
+            "flight_code": body["flight_code"],
+            "origin":      body["origin"],
+            "destination": body["destination"],
+            "base_price":  float(body["base_price"]),
+            "passengers":  int(body.get("passengers", 0)),
+            "promotion":   float(body.get("promotion", 0.0)),
+            "alert":       body.get("alert", ""),
+            "priority":    int(body.get("priority", 3)),
+        })
+
+        avl_tree.insert(new_node)
+        storage.set_current_avl_tree(avl_tree.root)
+
+        return jsonify({
+            "message": f"Vuelo '{body['flight_code']}' insertado correctamente.",
+            "avl": _tree_to_response(avl_tree.root, "AVL", avl_tree.rotation_count),
+        }), 200
+
+    except Exception as exc:
+        return jsonify({"error": f"Error al insertar: {str(exc)}"}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DELETE /api/delete/<flight_code>
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/delete/<flight_code>", methods=["DELETE"])
+def delete_flight(flight_code):
+    """
+    Elimina un vuelo del árbol AVL por su código.
+
+    URL: DELETE /api/delete/SK010
+    """
+    if avl_tree.root is None:
+        return jsonify({"error": "El árbol está vacío."}), 404
+
+    success = avl_tree.delete(flight_code)
+    if not success:
+        return jsonify({"error": f"Vuelo '{flight_code}' no encontrado en el árbol."}), 404
+
+    storage.set_current_avl_tree(avl_tree.root)
+
+    return jsonify({
+        "message": f"Vuelo '{flight_code}' eliminado correctamente.",
+        "avl": _tree_to_response(avl_tree.root, "AVL", avl_tree.rotation_count),
+    }), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # GET /api/status
 # ─────────────────────────────────────────────────────────────────────────────
 

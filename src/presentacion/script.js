@@ -226,6 +226,9 @@ function showNodeDetails(nodeData) {
     </table>`;
 
   modal.style.display = "block";
+
+  // También rellena el formulario para poder eliminar desde ahí
+  if (window._fillFormFromNode) window._fillFormFromNode(nodeData);
 }
 
 
@@ -323,6 +326,124 @@ document.addEventListener("DOMContentLoaded", () => {
     report.innerHTML = issues.length
       ? `<p style="color:red">⚠ Nodos fuera de rango:</p><ul>${issues.map(i => `<li>${i}</li>`).join("")}</ul>`
       : `<p style="color:green">✔ Propiedad AVL verificada correctamente.</p>`;
+  });
+
+  // ── Helpers internos del formulario ──────────────────────────────────
+
+  // Lee los campos del formulario y devuelve un objeto con los datos
+  function readForm() {
+    return {
+      flight_code:  document.getElementById("flightCode")?.value.trim(),
+      origin:       document.getElementById("origin")?.value.trim(),
+      destination:  document.getElementById("destination")?.value.trim(),
+      base_price:   parseFloat(document.getElementById("basePrice")?.value),
+      passengers:   parseInt(document.getElementById("passengers")?.value ?? "0", 10),
+      promotion:    parseFloat(document.getElementById("promotion")?.value ?? "0"),
+      alert:        document.getElementById("alert")?.value.trim() ?? "",
+      priority:     parseInt(document.getElementById("priority")?.value ?? "3", 10),
+    };
+  }
+
+  // Limpia todos los campos del formulario y desactiva botones de edición
+  function clearForm() {
+    ["flightCode","origin","destination","basePrice","passengers","promotion","alert"]
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    const prio = document.getElementById("priority");
+    if (prio) prio.value = "3";
+    document.getElementById("editFlightBtn")?.setAttribute("disabled", true);
+    document.getElementById("deleteFlightBtn")?.setAttribute("disabled", true);
+    document.getElementById("cancelFlightBtn")?.setAttribute("disabled", true);
+    selectedFlightCode = null;
+  }
+
+  // Actualiza árbol local y redibuja tras cualquier operación exitosa
+  function applyTreeResponse(data) {
+    currentAVL = data.avl;
+    updatePanels(data.avl, currentBST || { root: null, height: 0, nodes: 0, leaves: 0, rotation_count: {} });
+    renderTree(data.avl.tree_structure, data.avl.root_code);
+  }
+
+  // ── Selección de nodo al hacer click en el árbol ──────────────────────
+  // Cuando el usuario hace click en un nodo, además de mostrar el modal
+  // de detalles, rellena el formulario para poder editar o eliminar.
+  let selectedFlightCode = null;
+
+  // Sobreescribimos showNodeDetails para que también rellene el formulario
+  const _originalShowNodeDetails = showNodeDetails;
+  window._fillFormFromNode = function(nodeData) {
+    const fd = currentAVL?.tree_structure?.[nodeData.id]?.flight_data || {};
+    selectedFlightCode = nodeData.id;
+
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ""; };
+    set("flightCode",   fd.flight_code  ?? nodeData.id);
+    set("origin",       fd.origin       ?? "");
+    set("destination",  fd.destination  ?? "");
+    set("basePrice",    fd.base_price   ?? "");
+    set("passengers",   fd.passengers   ?? 0);
+    set("promotion",    fd.promotion    ?? 0);
+    set("alert",        fd.alert        ?? "");
+    const prio = document.getElementById("priority");
+    if (prio) prio.value = fd.priority ?? 3;
+
+    // Habilitar botones de edición/eliminación
+    document.getElementById("editFlightBtn")?.removeAttribute("disabled");
+    document.getElementById("deleteFlightBtn")?.removeAttribute("disabled");
+    document.getElementById("cancelFlightBtn")?.removeAttribute("disabled");
+  };
+
+  // ── Agregar vuelo ─────────────────────────────────────────────────────
+  document.getElementById("addFlightBtn")?.addEventListener("click", async () => {
+    const data = readForm();
+
+    if (!data.flight_code || !data.origin || !data.destination || isNaN(data.base_price)) {
+      alert("Completa los campos obligatorios: Código, Origen, Destino y Precio Base.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/api/insert`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) { alert(`Error: ${json.error}`); return; }
+
+      applyTreeResponse(json);
+      clearForm();
+    } catch (err) {
+      console.error(err);
+      alert(`Error al agregar: ${err.message}`);
+    }
+  });
+
+  // ── Eliminar vuelo ────────────────────────────────────────────────────
+  // El código del vuelo a eliminar viene del campo flightCode del formulario
+  // (que se rellena al hacer click en un nodo del árbol).
+  document.getElementById("deleteFlightBtn")?.addEventListener("click", async () => {
+    const code = document.getElementById("flightCode")?.value.trim();
+    if (!code) { alert("Selecciona un vuelo del árbol primero (haz click en un nodo)."); return; }
+
+    if (!confirm(`¿Eliminar el vuelo ${code}?`)) return;
+
+    try {
+      const res = await fetch(`${API}/api/delete/${encodeURIComponent(code)}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok) { alert(`Error: ${json.error}`); return; }
+
+      applyTreeResponse(json);
+      clearForm();
+    } catch (err) {
+      console.error(err);
+      alert(`Error al eliminar: ${err.message}`);
+    }
+  });
+
+  // ── Cancelar / limpiar formulario ─────────────────────────────────────
+  document.getElementById("cancelFlightBtn")?.addEventListener("click", () => {
+    clearForm();
   });
 
 });
