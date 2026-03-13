@@ -19,8 +19,8 @@ from src.modelos.AVLTree import AVLTree
 from src.modelos.BST import BST
 from src.negocio.AVLTreeManager import AVLTreeManager
 from src.negocio.TreeAnalysisManager import TreeAnalysisManager
-from src.negocio.TreeSerializationManager import TreeSerializationManager
 from src.acceso_datos.DataPersistence import DataPersistence
+from src.acceso_datos.DataStorage import DataStorage
 from src.acceso_datos.VersionManager import VersionManager
 
 app = Flask(
@@ -50,7 +50,7 @@ persistence    = DataPersistence()
 versions       = VersionManager()
 critical_depth = 5                  # default critical depth threshold
 analysis       = TreeAnalysisManager()
-serialization  = TreeSerializationManager()
+storage        = DataStorage()
 
 
 # ===========================================================================
@@ -135,7 +135,8 @@ def _tree_payload() -> dict:
             "LR":                t.rotation_count["LR"],
             "RL":                t.rotation_count["RL"],
             "total_rotations":   sum(t.rotation_count.values()),
-            "mass_cancellations": t.cascade_rebalance_count,
+            "global_rebalances": t.cascade_rebalance_count,
+            "mass_cancellations": t.mass_cancellation_count,
         },
     }
 
@@ -206,12 +207,12 @@ def load_tree():
 
     global manager, bst_tree
     if load_type == "topology":
-        rebuilt_avl = serialization.reconstruct_from_topology(data)
+        rebuilt_avl = storage.reconstruct_avl_from_dict(data)
         if rebuilt_avl is None:
             return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
         manager = AVLTreeManager(rebuilt_avl)
     else:
-        rebuilt = serialization.reconstruct_from_insertion(data)
+        rebuilt = storage.reconstruct_both_from_flights(data)
         if rebuilt is None:
             return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
         rebuilt_avl, rebuilt_bst = rebuilt
@@ -331,8 +332,6 @@ def cancel_flight():
 
     try:
         removed = manager.cancel_flight(flight_code)
-        # Increment cascade counter for metrics display
-        manager.tree.cascade_rebalance_count += 1
     except (ValueError, KeyError) as exc:
         return jsonify({"error": str(exc)}), 404
 
@@ -511,7 +510,6 @@ def delete_least_profitable():
 
     try:
         removed = manager.cancel_flight(target.flight_code)
-        manager.tree.cascade_rebalance_count += 1
     except (ValueError, KeyError) as exc:
         return jsonify({"error": str(exc)}), 500
 

@@ -20,7 +20,7 @@ class AVLTree:
     Attributes:
         root (FlightNode): Root node of the AVL tree
         rotation_count (Dict): Counter for rotation types (LL, RR, LR, RL)
-        cascade_rebalance_count (int): Count of cascade rebalancing operations
+        cascade_rebalance_count (int): Count of global rebalance passes executed
         stress_mode (bool): Whether insertions defer rotations until a global rebalance
     """
     
@@ -35,6 +35,7 @@ class AVLTree:
         self.root: Optional[FlightNode] = None
         self.rotation_count = {"LL": 0, "RR": 0, "LR": 0, "RL": 0}
         self.cascade_rebalance_count = 0
+        self.mass_cancellation_count = 0
         self.stress_mode = stress_mode
     
     # ============================================================================
@@ -517,6 +518,7 @@ class AVLTree:
                 self._check_balance(parent)
 
         target.parent = None
+        self.mass_cancellation_count += 1
         return removed_count
 
     def _count_subtree_nodes(self, node: Optional[FlightNode]) -> int:
@@ -694,13 +696,15 @@ class AVLTree:
             elif balance_case == "LR":
                 left_child = node.left
                 assert left_child is not None
-                self._rotate_left(left_child)
-                self._rotate_right(node)
+                self._rotate_left(left_child, count_rotation=False)
+                self._rotate_right(node, count_rotation=False)
+                self.rotation_count["LR"] += 1
             elif balance_case == "RL":
                 right_child = node.right
                 assert right_child is not None
-                self._rotate_right(right_child)
-                self._rotate_left(node)
+                self._rotate_right(right_child, count_rotation=False)
+                self._rotate_left(node, count_rotation=False)
+                self.rotation_count["RL"] += 1
         
         # Check parent balance
         if node.parent is not None:
@@ -752,12 +756,13 @@ class AVLTree:
     # ROTATION OPERATIONS
     # ============================================================================
     
-    def _rotate_right(self, top_node: FlightNode) -> None:
+    def _rotate_right(self, top_node: FlightNode, count_rotation: bool = True) -> None:
         """
         Perform right rotation.
         
         Args:
             top_node (FlightNode): Node to rotate right.
+            count_rotation (bool): Whether to increment LL counter.
         """
         middle_node = top_node.left
         assert middle_node is not None
@@ -791,14 +796,16 @@ class AVLTree:
         top_node.balance_factor = self._get_balance_factor(top_node)
         middle_node.balance_factor = self._get_balance_factor(middle_node)
 
-        self.rotation_count["LL"] += 1
+        if count_rotation:
+            self.rotation_count["LL"] += 1
     
-    def _rotate_left(self, top_node: FlightNode) -> None:
+    def _rotate_left(self, top_node: FlightNode, count_rotation: bool = True) -> None:
         """
         Perform left rotation.
         
         Args:
             top_node (FlightNode): Node to rotate left.
+            count_rotation (bool): Whether to increment RR counter.
         """
         middle_node = top_node.right
         assert middle_node is not None
@@ -832,7 +839,8 @@ class AVLTree:
         top_node.balance_factor = self._get_balance_factor(top_node)
         middle_node.balance_factor = self._get_balance_factor(middle_node)
 
-        self.rotation_count["RR"] += 1
+        if count_rotation:
+            self.rotation_count["RR"] += 1
     
     # ============================================================================
     # GLOBAL REBALANCING (STRESS MODE)
@@ -892,10 +900,12 @@ class AVLTree:
             elif balance_case == "LR":
                 left_child = node.left
                 assert left_child is not None
-                self._rotate_left(left_child)
-                self._rotate_right(node)
+                self._rotate_left(left_child, count_rotation=False)
+                self._rotate_right(node, count_rotation=False)
+                self.rotation_count["LR"] += 1
             elif balance_case == "RL":
                 right_child = node.right
                 assert right_child is not None
-                self._rotate_right(right_child)
-                self._rotate_left(node)
+                self._rotate_right(right_child, count_rotation=False)
+                self._rotate_left(node, count_rotation=False)
+                self.rotation_count["RL"] += 1

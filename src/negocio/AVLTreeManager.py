@@ -56,6 +56,7 @@ class AVLTreeManager:
             "tree_data": self._persistence.serialize_tree_for_storage(self.tree.root),
             "rotation_count": self.tree.rotation_count.copy(),
             "cascade_rebalance_count": self.tree.cascade_rebalance_count,
+            "mass_cancellation_count": self.tree.mass_cancellation_count,
             "stress_mode": self.tree.stress_mode,
         }
 
@@ -89,6 +90,9 @@ class AVLTreeManager:
         self.tree.rotation_count = snapshot.get("rotation_count", self.tree.rotation_count.copy())
         self.tree.cascade_rebalance_count = int(
             snapshot.get("cascade_rebalance_count", self.tree.cascade_rebalance_count)
+        )
+        self.tree.mass_cancellation_count = int(
+            snapshot.get("mass_cancellation_count", self.tree.mass_cancellation_count)
         )
         self.tree.stress_mode = bool(snapshot.get("stress_mode", self.tree.stress_mode))
         return True

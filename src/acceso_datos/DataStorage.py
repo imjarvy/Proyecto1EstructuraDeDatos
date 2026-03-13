@@ -317,6 +317,56 @@ class DataStorage:
             bool: True if operation successful.
         """
         return self.version_manager.clear_all_versions()
+
+    # ============================================================================
+    # IN-MEMORY RECONSTRUCTION (web / dict-based API)
+    # ============================================================================
+
+    def reconstruct_avl_from_dict(self, data: Dict) -> Optional[AVLTree]:
+        """
+        Rebuild an AVL tree from an already-parsed topology dict.
+
+        Expected keys: root_code, tree_structure.
+        Delegates deserialization to DataPersistence so there is a single
+        source of truth for the topology format.
+
+        Args:
+            data (Dict): Parsed JSON payload in topology format.
+
+        Returns:
+            AVLTree: Reconstructed tree, or None if data is invalid.
+        """
+        root = self.persistence.deserialize_tree_from_dict(data)
+        if root is None:
+            return None
+        avl = AVLTree()
+        avl.root = root
+        return avl
+
+    def reconstruct_both_from_flights(self, data: Dict) -> Optional[Tuple[AVLTree, BST]]:
+        """
+        Rebuild AVL and BST by inserting flights from an already-parsed dict.
+
+        Expected key: flights (list of flight dicts).
+
+        Args:
+            data (Dict): Parsed JSON payload with a 'flights' list.
+
+        Returns:
+            Tuple[AVLTree, BST]: Both reconstructed trees, or None if invalid.
+        """
+        flights = data.get("flights", [])
+        if not flights:
+            return None
+
+        avl = AVLTree()
+        bst = BST()
+        for flight_data in flights:
+            node = self._clone_flight_node(FlightNode.from_dict(flight_data))
+            avl.insert(node)
+            bst.insert(self._clone_flight_node(FlightNode.from_dict(flight_data)))
+
+        return avl, bst
     
     # ============================================================================
     # UTILITY OPERATIONS

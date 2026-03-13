@@ -19,7 +19,7 @@ class TreeAnalysisManager:
         if depth > limit:
             node.final_price = round(node.base_price * 1.25, 2)
         else:
-            node.final_price = node.base_price
+            node.final_price = round(node.base_price * (1.0 - node.promotion), 2)
 
         self.apply_depth_penalties(node.left, depth + 1, limit)
         self.apply_depth_penalties(node.right, depth + 1, limit)
