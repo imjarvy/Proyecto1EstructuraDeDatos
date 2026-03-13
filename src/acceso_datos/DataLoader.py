@@ -6,7 +6,7 @@ tree structures in both topology and insertion modes.
 """
 
 import json
-from typing import Optional, List, Tuple
+from typing import Optional, List, Literal
 from tkinter import filedialog
 from src.modelos.FlightNode import FlightNode
 
@@ -99,17 +99,44 @@ class DataLoader:
         """
         self.flights_list = []
         self.node_map = {}
-        
-        if not self.raw_data or "flights" not in self.raw_data:
-            print("Warning: No 'flights' key found in JSON.")
+
+        if not self.raw_data:
+            print("Warning: Loaded JSON is empty.")
             return
-        
-        for flight_data in self.raw_data["flights"]:
+
+        if not isinstance(self.raw_data, dict):
+            print("Warning: JSON root must be an object.")
+            return
+
+        flights_source = self.raw_data.get("flights")
+        if not isinstance(flights_source, list):
+            # In topology mode there may be no flights list, this is expected.
+            return
+
+        for flight_data in flights_source:
             flight_code = flight_data.get("flight_code")
             if flight_code:
                 node = FlightNode.from_dict(flight_data)
                 self.flights_list.append(node)
                 self.node_map[flight_code] = node
+
+    def get_reconstruction_mode(self) -> Literal["topology", "insertion", "unknown"]:
+        """
+        Infer the intended reconstruction mode from loaded JSON structure.
+
+        Returns:
+            Literal["topology", "insertion", "unknown"]: Detected mode.
+        """
+        if isinstance(self.raw_data, dict):
+            has_topology = "tree_structure" in self.raw_data and "root_code" in self.raw_data
+            has_insertion = isinstance(self.raw_data.get("flights"), list)
+
+            if has_topology:
+                return "topology"
+            if has_insertion:
+                return "insertion"
+
+        return "unknown"
     
     def reconstruct_topology_mode(self) -> Optional[FlightNode]:
         """
@@ -133,7 +160,11 @@ class DataLoader:
         if not self.raw_data:
             print("Error: No data loaded.")
             return None
-        
+
+        if self.get_reconstruction_mode() != "topology":
+            print("Error: Loaded JSON is not in topology mode.")
+            return None
+
         if "tree_structure" not in self.raw_data or "root_code" not in self.raw_data:
             print("Error: Missing 'tree_structure' or 'root_code' in JSON.")
             return None
@@ -159,10 +190,14 @@ class DataLoader:
         self.node_map = {}
         
         for flight_code, node_data in tree_structure.items():
-            if "flight_data" in node_data:
-                flight_info = node_data["flight_data"]
-                node = FlightNode.from_dict(flight_info)
-                self.node_map[flight_code] = node
+            if "flight_data" not in node_data:
+                raise ValueError(
+                    f"Invalid topology JSON: node '{flight_code}' is missing 'flight_data'."
+                )
+
+            flight_info = node_data["flight_data"]
+            node = FlightNode.from_dict(flight_info)
+            self.node_map[flight_code] = node
     
     def _establish_relationships(self, tree_structure: dict, root_code: str) -> Optional[FlightNode]:
         """

@@ -1,287 +1,695 @@
 """
-app.py  –  SkyBalance AVL · Servidor Flask
-Coloca este archivo en la RAÍZ del proyecto.
+SkyBalance AVL - Flask Web Application.
 
-Estructura real del proyecto:
-    proyecto/
-    ├── app.py
-    ├── src/
-    │   ├── modelos/
-    │   │   ├── FlightNode.py
-    │   │   └── AVLTree.py
-    │   └── acceso_datos/
-    │       ├── DataLoader.py
-    │       ├── DataPersistence.py
-    │       ├── DataStorage.py
-    │       └── VersionManager.py
-    └── presentacion/
-        ├── vistas/
-        │   └── index.html
-        ├── script.js
-        └── estilos/
-            └── styles.css
+REST API layer that bridges the Python backend with the HTML/JS frontend.
+Only exposes endpoints for functionality already implemented in the Python
+modules: AVLTree, AVLTreeManager, BST, DataPersistence, VersionManager.
 """
 
-import os
 import json
 import tempfile
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
 
-from src.acceso_datos.DataStorage import DataStorage
-from src.acceso_datos.DataPersistence import DataPersistence
-from src.modelos.AVLTree import AVLTree          # ← corregido: estaba en estructuras, es en modelos
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# static_folder apunta a presentacion/ para servir script.js y estilos/
-# El index.html se sirve manualmente desde presentacion/vistas/
-# ─────────────────────────────────────────────────────────────────────────────
-app = Flask(__name__, static_folder="src/presentacion", static_url_path="")
+from src.modelos.AVLTree import AVLTree
+from src.modelos.BST import BST
+from src.modelos.FlightNode import FlightNode
+from src.negocio.AVLTreeManager import AVLTreeManager
+from src.acceso_datos.DataPersistence import DataPersistence
+from src.acceso_datos.VersionManager import VersionManager
+
+app = Flask(
+    __name__,
+    template_folder="src/presentacion/vistas",
+    static_folder="src/presentacion/estilos",
+    static_url_path="/estilos",
+)
 CORS(app)
 
-storage  = DataStorage()
-avl_tree = AVLTree()
+# Route to serve static files from src/negocio/ (script.js, etc.)
+NEGOCIO_DIR = os.path.join(os.path.dirname(__file__), "src", "negocio")
+
+@app.route("/negocio/<path:filename>")
+def negocio_static(filename):
+    """Serve static files from the negocio directory."""
+    return send_from_directory(NEGOCIO_DIR, filename)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Servir el frontend
-# ─────────────────────────────────────────────────────────────────────────────
+# ===========================================================================
+# GLOBAL STATE
+# ===========================================================================
+
+manager        = AVLTreeManager()   # wraps AVLTree + undo stack
+bst_tree       = BST()              # plain BST used for insertion-mode comparison
+persistence    = DataPersistence()
+versions       = VersionManager()
+critical_depth = 5                  # default critical depth threshold
+
+
+# ===========================================================================
+# HELPERS
+# ===========================================================================
+
+def _node_to_dict(node, depth: int = 0):
+    """
+    Recursively convert a FlightNode tree into a nested dict for D3.
+
+    Args:
+        node: Current FlightNode (or None).
+        depth: Current depth in the tree.
+
+    Returns:
+        dict with all node fields plus 'depth', 'is_critical', 'left', 'right'.
+    """
+    if node is None:
+        return None
+    d = node.to_dict()
+    d["depth"]       = depth
+    d["is_critical"] = depth > critical_depth
+    d["left"]        = _node_to_dict(node.left,  depth + 1)
+    d["right"]       = _node_to_dict(node.right, depth + 1)
+    return d
+
+
+def _bst_node_to_dict(node, depth: int = 0):
+    """
+    Recursively convert a BST FlightNode into a nested dict.
+
+    Args:
+        node: Current FlightNode (or None).
+        depth: Current depth in the tree.
+
+    Returns:
+        dict with all node fields plus 'depth', 'left', 'right'.
+    """
+    if node is None:
+        return None
+    d = node.to_dict()
+    d["depth"] = depth
+    d["left"]  = _bst_node_to_dict(node.left,  depth + 1)
+    d["right"] = _bst_node_to_dict(node.right, depth + 1)
+    return d
+
+
+def _tree_payload() -> dict:
+    """
+    Build the standardised AVL tree payload returned to the frontend.
+
+    Includes the nested root hierarchy for D3, tree metadata, rotation
+    counters, traversal orders, and whether an undo action is available.
+
+    Returns:
+        dict with keys: root, height, node_count, leaf_count, can_undo,
+        breadth_order, depth_order, metrics.
+    """
+    t    = manager.tree
+    meta = persistence.get_tree_metadata(t.root)
+
+    breadth_codes = []
+    depth_codes   = []
+    if t.root:
+        try:
+            breadth_codes = [n.flight_code for n in t.breadth_first_search()]
+            depth_codes   = [n.flight_code for n in t.pre_order_traversal()]
+        except Exception:
+            pass
+
+    return {
+        "root":          _node_to_dict(t.root),
+        "height":        meta["height"],
+        "node_count":    meta["node_count"],
+        "leaf_count":    meta["leaf_count"],
+        "can_undo":      manager.can_undo(),
+        "breadth_order": breadth_codes,
+        "depth_order":   depth_codes,
+        "metrics": {
+            "LL":                t.rotation_count["LL"],
+            "RR":                t.rotation_count["RR"],
+            "LR":                t.rotation_count["LR"],
+            "RL":                t.rotation_count["RL"],
+            "total_rotations":   sum(t.rotation_count.values()),
+            "mass_cancellations": t.cascade_rebalance_count,
+        },
+    }
+
+
+def _bst_payload() -> dict:
+    """
+    Build the BST comparison payload.
+
+    Returns:
+        dict with keys: root, height, node_count, leaf_count.
+    """
+    if bst_tree.root is None:
+        return {"root": None, "height": 0, "node_count": 0, "leaf_count": 0}
+    props = bst_tree.get_properties()
+    return {
+        "root":       _bst_node_to_dict(bst_tree.root),
+        "height":     props["height"],
+        "node_count": props["node_count"],
+        "leaf_count": props["leaf_count"],
+    }
+
+
+def _reconstruct_from_topology(data: dict) -> bool:
+    """
+    Rebuild manager.tree from a topology-format JSON.
+
+    Expected JSON keys: 'root_code', 'tree_structure' (mapping flight codes
+    to dicts with 'flight_data', 'left_child', 'right_child').
+
+    Args:
+        data: Parsed JSON dictionary.
+
+    Returns:
+        True if reconstruction succeeded, False otherwise.
+    """
+    global manager
+    tree_structure = data.get("tree_structure")
+    root_code      = data.get("root_code")
+    if not tree_structure or not root_code:
+        return False
+
+    # Build all nodes first
+    node_map = {}
+    for code, entry in tree_structure.items():
+        node_map[code] = FlightNode.from_dict(entry["flight_data"])
+
+    root_node = node_map.get(root_code)
+    if root_node is None:
+        return False
+
+    # Establish parent-child relationships
+    for code, entry in tree_structure.items():
+        current = node_map[code]
+        lc = entry.get("left_child")
+        rc = entry.get("right_child")
+        if lc and lc in node_map:
+            current.left = node_map[lc]
+            node_map[lc].parent = current
+        if rc and rc in node_map:
+            current.right = node_map[rc]
+            node_map[rc].parent = current
+
+    new_avl       = AVLTree()
+    new_avl.root  = root_node
+    manager       = AVLTreeManager(new_avl)
+    return True
+
+
+def _reconstruct_from_insertion(data: dict) -> bool:
+    """
+    Rebuild manager.tree (AVL) and bst_tree by inserting flights one by one.
+
+    Expected JSON key: 'flights' (list of flight dicts).
+
+    Args:
+        data: Parsed JSON dictionary.
+
+    Returns:
+        True if reconstruction succeeded, False otherwise.
+    """
+    global manager, bst_tree
+    flights = data.get("flights", [])
+    if not flights:
+        return False
+
+    new_avl  = AVLTree()
+    bst_tree = BST()
+
+    for fd in flights:
+        new_avl.insert(FlightNode.from_dict(fd))
+        bst_tree.insert(FlightNode.from_dict(fd))
+
+    manager = AVLTreeManager(new_avl)
+    return True
+
+
+def _apply_depth_penalties(node, depth: int, limit: int) -> None:
+    """
+    Walk the tree and adjust final_price based on the critical depth rule.
+
+    Nodes deeper than 'limit' receive a 25% price increase on their base price.
+    Nodes at or above the limit are reset to their base price.
+
+    Args:
+        node: Current FlightNode (or None).
+        depth: Current depth of the node.
+        limit: Critical depth threshold.
+    """
+    if node is None:
+        return
+    if depth > limit:
+        node.final_price = round(node.base_price * 1.25, 2)
+    else:
+        node.final_price = node.base_price
+    _apply_depth_penalties(node.left,  depth + 1, limit)
+    _apply_depth_penalties(node.right, depth + 1, limit)
+
+
+def _audit_node(node, report: list, depth: int = 0) -> bool:
+    """
+    Recursively verify the AVL balance property on every node.
+
+    Checks that balance_factor ∈ {-1, 0, 1} and that the stored height
+    matches the actual computed height.
+
+    Args:
+        node: Current FlightNode (or None).
+        report: List to append issue dicts to.
+        depth: Current depth of the node.
+
+    Returns:
+        True if the subtree is fully valid, False otherwise.
+    """
+    if node is None:
+        return True
+
+    issues = []
+
+    if node.balance_factor not in (-1, 0, 1):
+        issues.append(
+            f"Balance factor = {node.balance_factor}, expected value in {{-1, 0, 1}}"
+        )
+
+    def _h(n):
+        return n.height if n else -1
+
+    expected_height = max(_h(node.left), _h(node.right)) + 1 if (node.left or node.right) else 0
+    if node.height != expected_height:
+        issues.append(
+            f"Stored height = {node.height}, but computed height = {expected_height}"
+        )
+
+    if issues:
+        report.append({"flight_code": node.flight_code, "depth": depth, "issues": issues})
+
+    left_ok  = _audit_node(node.left,  report, depth + 1)
+    right_ok = _audit_node(node.right, report, depth + 1)
+    return len(issues) == 0 and left_ok and right_ok
+
+
+def _find_least_profitable(node, depth: int):
+    """
+    Find the node with the lowest profitability score.
+
+    Profitability = passengers × final_price − promotion.
+    Tie-breaking rules (spec §8):
+      1. Prefer the deeper node.
+      2. If still tied, prefer the larger flight_code (lexicographic).
+
+    Args:
+        node: Current FlightNode (or None).
+        depth: Current depth of the node.
+
+    Returns:
+        The least profitable FlightNode, or None if the subtree is empty.
+    """
+    if node is None:
+        return None
+
+    def profitability(n):
+        return n.passengers * n.final_price - n.promotion
+
+    best   = node
+    best_p = profitability(node)
+    best_d = depth
+
+    for child, d in [(node.left, depth + 1), (node.right, depth + 1)]:
+        candidate = _find_least_profitable(child, d)
+        if candidate is None:
+            continue
+        cand_p = profitability(candidate)
+        if (cand_p < best_p
+                or (cand_p == best_p and d > best_d)
+                or (cand_p == best_p and d == best_d
+                    and candidate.flight_code > best.flight_code)):
+            best, best_p, best_d = candidate, cand_p, d
+
+    return best
+
+
+# ===========================================================================
+# ROUTES
+# ===========================================================================
 
 @app.route("/")
 def index():
-    # index.html está en src/presentacion/vistas/
-    return send_from_directory(os.path.join("src", "presentacion", "vistas"), "index.html")
+    """Serve the main HTML page."""
+    return render_template("index.html")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper interno
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# TREE STATE
+# ---------------------------------------------------------------------------
 
-def _tree_to_response(root, label: str, rotation_count: dict = None) -> dict:
-    if root is None:
-        return {
-            "label": label, "root": None, "root_code": None,
-            "height": 0, "nodes": 0, "leaves": 0,
-            "tree_structure": {},
-            "rotation_count": rotation_count or {}
-        }
-
-    persistence = DataPersistence()
-    meta        = persistence.get_tree_metadata(root)
-    serialised  = persistence.serialize_tree_for_storage(root)
-
-    return {
-        "label":          label,
-        "root":           meta.get("root"),
-        "root_code":      serialised.get("root_code") if serialised else None,
-        "height":         meta.get("height", 0),
-        "nodes":          meta.get("node_count", 0),
-        "leaves":         meta.get("leaf_count", 0),
-        "tree_structure": serialised.get("tree_structure", {}) if serialised else {},
-        "rotation_count": rotation_count or {}
-    }
+@app.route("/api/tree-state", methods=["GET"])
+def tree_state():
+    """Return the full current AVL tree state (called on page load)."""
+    return jsonify({"tree": _tree_payload()})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# POST /api/load
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# LOAD TREE
+# ---------------------------------------------------------------------------
 
-@app.route("/api/load", methods=["POST"])
+@app.route("/api/load-tree", methods=["POST"])
 def load_tree():
-    global avl_tree
+    """
+    Accept a JSON file upload and rebuild the in-memory tree(s).
 
-    if "file" not in request.files:
-        return jsonify({"error": "No se recibió ningún archivo."}), 400
+    Form fields:
+        file : the JSON file
+        type : 'topology' | 'insertion'
 
-    uploaded_file = request.files["file"]
-    if uploaded_file.filename == "":
-        return jsonify({"error": "El archivo está vacío."}), 400
+    Returns the AVL tree payload; insertion mode also includes bst_tree.
+    """
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "No file provided"}), 400
 
-    load_type = request.form.get("load_type", "insertion").lower()
-    if load_type not in ("topology", "insertion"):
-        return jsonify({"error": "load_type debe ser 'topology' o 'insertion'."}), 400
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-        tmp_path = tmp.name
-        uploaded_file.save(tmp_path)
+    load_type = request.form.get("type", "topology")
 
     try:
-        if not storage.load_data_from_path(tmp_path):
-            return jsonify({"error": "No se pudo parsear el archivo JSON."}), 422
+        data = json.load(file)
+    except json.JSONDecodeError as exc:
+        return jsonify({"error": f"Invalid JSON: {exc}"}), 400
 
-        if load_type == "topology":
-            avl_root = storage.reconstruct_tree_from_topology()
-            if avl_root is None:
-                return jsonify({
-                    "error": "Reconstrucción por topología fallida. "
-                             "El JSON debe contener 'root_code' y 'tree_structure'."
-                }), 422
-            avl_tree      = AVLTree()
-            avl_tree.root = avl_root
-            storage.set_current_avl_tree(avl_root)
-            storage.set_current_bst_tree(None)
+    if load_type == "topology":
+        ok = _reconstruct_from_topology(data)
+    else:
+        ok = _reconstruct_from_insertion(data)
 
-        else:
-            flights = storage.get_flights_for_insertion_mode()
-            if not flights:
-                return jsonify({"error": "No se encontraron vuelos en el JSON."}), 422
+    if not ok:
+        return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
 
-            avl_tree = AVLTree()
-            for flight in flights:
-                avl_tree.insert(flight)
+    response = {"tree": _tree_payload()}
+    if load_type == "insertion":
+        response["bst_tree"] = _bst_payload()
 
-            storage.set_current_avl_tree(avl_tree.root)
-            storage.set_current_bst_tree(None)
-
-        return jsonify({
-            "load_type": load_type,
-            "avl": _tree_to_response(
-                storage.get_current_avl_root(), "AVL", avl_tree.rotation_count
-            ),
-            "bst": _tree_to_response(storage.get_current_bst_root(), "BST"),
-        }), 200
-
-    except Exception as exc:
-        return jsonify({"error": f"Error en el servidor: {str(exc)}"}), 500
-
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    return jsonify(response)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GET /api/export
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# EXPORT TREE  — DataPersistence.serialize_tree_for_storage
+# ---------------------------------------------------------------------------
 
-@app.route("/api/export", methods=["GET"])
+@app.route("/api/export-tree", methods=["GET"])
 def export_tree():
-    tree_param = request.args.get("tree", "avl").lower()
-    root = (storage.get_current_avl_root()
-            if tree_param == "avl"
-            else storage.get_current_bst_root())
+    """Serialize the current AVL tree structure for JSON download."""
+    if manager.tree.root is None:
+        return jsonify({"error": "Tree is empty"}), 400
+    serialized = persistence.serialize_tree_for_storage(manager.tree.root)
+    return jsonify(serialized)
 
+
+# ---------------------------------------------------------------------------
+# FLIGHT CRUD  — AVLTreeManager (undo push happens automatically inside)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/add-flight", methods=["POST"])
+def add_flight():
+    """
+    Insert a new flight into the AVL tree.
+
+    Body JSON: flight_code, origin, destination, base_price,
+               passengers (opt), promotion (opt), alert (opt), priority (opt).
+    """
+    data = request.get_json(silent=True) or {}
+    required = ("flight_code", "origin", "destination", "base_price")
+    if not all(data.get(f) for f in required):
+        return jsonify({"error": "Missing required fields: flight_code, origin, destination, base_price"}), 400
+
+    try:
+        manager.add_flight(
+            flight_code = str(data["flight_code"]),
+            origin      = str(data["origin"]),
+            destination = str(data["destination"]),
+            base_price  = float(data["base_price"]),
+            passengers  = int(data.get("passengers", 0)),
+            promotion   = float(data.get("promotion", 0.0)),
+            alert       = str(data.get("alert", "")),
+            priority    = int(data.get("priority", 3)),
+        )
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({"tree": _tree_payload()})
+
+
+@app.route("/api/edit-flight", methods=["POST"])
+def edit_flight():
+    """
+    Update one or more fields of an existing flight.
+
+    Body JSON: flight_code, updated_data (dict of fields to change).
+    """
+    body         = request.get_json(silent=True) or {}
+    flight_code  = body.get("flight_code", "").strip()
+    updated_data = body.get("updated_data", {})
+
+    if not flight_code or not updated_data:
+        return jsonify({"error": "flight_code and updated_data are required"}), 400
+
+    try:
+        manager.update_flight(flight_code, **updated_data)
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({"tree": _tree_payload()})
+
+
+@app.route("/api/delete-flight", methods=["POST"])
+def delete_flight():
+    """
+    Remove a single flight node (standard AVL delete + rebalance).
+
+    Body JSON: flight_code.
+    """
+    body        = request.get_json(silent=True) or {}
+    flight_code = body.get("flight_code", "").strip()
+    if not flight_code:
+        return jsonify({"error": "flight_code is required"}), 400
+
+    try:
+        manager.delete_flight(flight_code)
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 404
+
+    return jsonify({"tree": _tree_payload()})
+
+
+@app.route("/api/cancel-flight", methods=["POST"])
+def cancel_flight():
+    """
+    Cancel a flight: remove the node AND all its descendants, then rebalance.
+
+    Body JSON: flight_code.
+    """
+    body        = request.get_json(silent=True) or {}
+    flight_code = body.get("flight_code", "").strip()
+    if not flight_code:
+        return jsonify({"error": "flight_code is required"}), 400
+
+    try:
+        removed = manager.cancel_flight(flight_code)
+        # Increment cascade counter for metrics display
+        manager.tree.cascade_rebalance_count += 1
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 404
+
+    return jsonify({"removed_count": removed, "tree": _tree_payload()})
+
+
+# ---------------------------------------------------------------------------
+# UNDO  — AVLTreeManager.undo_last_action
+# ---------------------------------------------------------------------------
+
+@app.route("/api/undo", methods=["POST"])
+def undo():
+    """Revert the last mutating action using the undo stack."""
+    ok = manager.undo_last_action()
+    if not ok:
+        return jsonify({"error": "No actions available to undo"}), 400
+    return jsonify({"tree": _tree_payload()})
+
+
+# ---------------------------------------------------------------------------
+# STRESS MODE  — AVLTree.set_stress_mode / global_rebalance
+# ---------------------------------------------------------------------------
+
+@app.route("/api/toggle-stress-mode", methods=["POST"])
+def toggle_stress_mode():
+    """
+    Toggle stress mode (deferred rebalancing).
+
+    Turning stress mode OFF automatically triggers a global rebalance.
+
+    Body JSON: stress_mode (bool).
+    """
+    body      = request.get_json(silent=True) or {}
+    new_state = bool(body.get("stress_mode", not manager.tree.stress_mode))
+
+    rotations_done = 0
+    if not new_state:
+        # Leaving stress mode: rebalance first, then disable
+        rotations_done = manager.global_rebalance()
+        manager.set_stress_mode(False)
+    else:
+        manager.set_stress_mode(True)
+
+    return jsonify({
+        "stress_mode":    manager.tree.stress_mode,
+        "rotations_done": rotations_done,
+        "tree":           _tree_payload(),
+    })
+
+
+@app.route("/api/global-rebalance", methods=["POST"])
+def global_rebalance():
+    """Trigger an explicit global rebalance on the entire tree."""
+    rotations = manager.global_rebalance()
+    return jsonify({"rotations_done": rotations, "tree": _tree_payload()})
+
+
+# ---------------------------------------------------------------------------
+# AVL AUDIT
+# ---------------------------------------------------------------------------
+
+@app.route("/api/audit-avl", methods=["GET"])
+def audit_avl():
+    """
+    Verify the AVL balance property across the whole tree.
+
+    Returns a per-node report listing any balance or height inconsistencies.
+    Intended for use during stress mode (spec §7).
+    """
+    report   = []
+    is_valid = _audit_node(manager.tree.root, report)
+    return jsonify({"valid": is_valid, "report": report})
+
+
+# ---------------------------------------------------------------------------
+# CRITICAL DEPTH / PENALISATION  — spec §6
+# ---------------------------------------------------------------------------
+
+@app.route("/api/update-critical-depth", methods=["POST"])
+def update_critical_depth():
+    """
+    Change the critical depth threshold and recompute final prices.
+
+    Nodes deeper than the threshold have their final_price set to
+    base_price × 1.25 (25% surcharge). Nodes at or above the threshold
+    are reset to base_price.
+
+    Body JSON: critical_depth (int).
+    """
+    global critical_depth
+    body           = request.get_json(silent=True) or {}
+    critical_depth = int(body.get("critical_depth", 5))
+    _apply_depth_penalties(manager.tree.root, 0, critical_depth)
+    return jsonify({"critical_depth": critical_depth, "tree": _tree_payload()})
+
+
+# ---------------------------------------------------------------------------
+# VERSIONS  — VersionManager
+# ---------------------------------------------------------------------------
+
+@app.route("/api/save-version", methods=["POST"])
+def save_version():
+    """
+    Save the current AVL tree as a named version.
+
+    Body JSON: version_name (str).
+    """
+    body         = request.get_json(silent=True) or {}
+    version_name = body.get("version_name", "").strip()
+    if not version_name:
+        return jsonify({"error": "version_name is required"}), 400
+    ok = versions.save_version(manager.tree.root, version_name)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/restore-version", methods=["POST"])
+def restore_version():
+    """
+    Restore a previously saved version into the active AVL tree.
+
+    Body JSON: version_name (str).
+    """
+    global manager
+    body         = request.get_json(silent=True) or {}
+    version_name = body.get("version_name", "").strip()
+    if not version_name:
+        return jsonify({"error": "version_name is required"}), 400
+
+    root = versions.restore_version(version_name)
     if root is None:
-        return jsonify({"error": f"No hay árbol {tree_param.upper()} cargado."}), 404
+        return jsonify({"error": f"Version '{version_name}' not found"}), 404
 
-    serialised = DataPersistence().serialize_tree_for_storage(root)
-    if serialised is None:
-        return jsonify({"error": "Error al serializar el árbol."}), 500
-
-    filename = f"skybalance_{tree_param}_export.json"
-    response = app.response_class(
-        response=json.dumps(serialised, indent=2, ensure_ascii=False),
-        status=200,
-        mimetype="application/json"
-    )
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
+    new_avl       = AVLTree()
+    new_avl.root  = root
+    manager       = AVLTreeManager(new_avl)
+    return jsonify({"tree": _tree_payload()})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# POST /api/insert
-# ─────────────────────────────────────────────────────────────────────────────
+@app.route("/api/list-versions", methods=["GET"])
+def list_versions():
+    """Return metadata for all saved versions."""
+    return jsonify({"versions": versions.get_all_versions_info()})
 
-@app.route("/api/insert", methods=["POST"])
-def insert_flight():
+
+@app.route("/api/delete-version", methods=["POST"])
+def delete_version():
     """
-    Inserta un vuelo nuevo en el árbol AVL.
+    Delete a saved version by name.
 
-    Request body (JSON):
-    {
-        "flight_code": "SK010",
-        "origin":      "Bogotá",
-        "destination": "Cali",
-        "base_price":  180000,
-        "passengers":  0,
-        "promotion":   0,
-        "alert":       "",
-        "priority":    3
-    }
+    Body JSON: version_name (str).
     """
-    body = request.get_json(silent=True)
-    if not body:
-        return jsonify({"error": "El cuerpo debe ser JSON."}), 400
-
-    required = ["flight_code", "origin", "destination", "base_price"]
-    missing  = [f for f in required if f not in body]
-    if missing:
-        return jsonify({"error": f"Faltan campos: {', '.join(missing)}"}), 400
-
-    # Verificar que el vuelo no exista ya
-    try:
-        existing = avl_tree.search(body["flight_code"])
-        if existing:
-            return jsonify({"error": f"El vuelo '{body['flight_code']}' ya existe en el árbol."}), 409
-    except Exception:
-        pass  # search lanza excepción si el árbol está vacío, lo cual es válido
-
-    try:
-        from src.modelos.FlightNode import FlightNode
-        new_node = FlightNode.from_dict({
-            "flight_code": body["flight_code"],
-            "origin":      body["origin"],
-            "destination": body["destination"],
-            "base_price":  float(body["base_price"]),
-            "passengers":  int(body.get("passengers", 0)),
-            "promotion":   float(body.get("promotion", 0.0)),
-            "alert":       body.get("alert", ""),
-            "priority":    int(body.get("priority", 3)),
-        })
-
-        avl_tree.insert(new_node)
-        storage.set_current_avl_tree(avl_tree.root)
-
-        return jsonify({
-            "message": f"Vuelo '{body['flight_code']}' insertado correctamente.",
-            "avl": _tree_to_response(avl_tree.root, "AVL", avl_tree.rotation_count),
-        }), 200
-
-    except Exception as exc:
-        return jsonify({"error": f"Error al insertar: {str(exc)}"}), 500
+    body         = request.get_json(silent=True) or {}
+    version_name = body.get("version_name", "").strip()
+    ok           = versions.delete_version(version_name)
+    return jsonify({"success": ok})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DELETE /api/delete/<flight_code>
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# ECONOMIC ELIMINATION  — spec §8
+# ---------------------------------------------------------------------------
 
 @app.route("/api/delete/<flight_code>", methods=["DELETE"])
 def delete_flight(flight_code):
     """
-    Elimina un vuelo del árbol AVL por su código.
+    Find and cancel the least-profitable flight (and its entire subtree).
 
-    URL: DELETE /api/delete/SK010
+    Profitability = passengers × final_price − promotion.
+    Tie-breaking: deepest node wins; then largest flight_code wins.
     """
-    if avl_tree.root is None:
-        return jsonify({"error": "El árbol está vacío."}), 404
+    if manager.tree.root is None:
+        return jsonify({"error": "Tree is empty"}), 400
 
-    success = avl_tree.delete(flight_code)
-    if not success:
-        return jsonify({"error": f"Vuelo '{flight_code}' no encontrado en el árbol."}), 404
+    target = _find_least_profitable(manager.tree.root, depth=0)
+    if target is None:
+        return jsonify({"error": "No nodes found"}), 500
 
-    storage.set_current_avl_tree(avl_tree.root)
+    try:
+        removed = manager.cancel_flight(target.flight_code)
+        manager.tree.cascade_rebalance_count += 1
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 500
 
     return jsonify({
-        "message": f"Vuelo '{flight_code}' eliminado correctamente.",
-        "avl": _tree_to_response(avl_tree.root, "AVL", avl_tree.rotation_count),
-    }), 200
+        "cancelled":     target.flight_code,
+        "removed_count": removed,
+        "tree":          _tree_payload(),
+    })
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GET /api/status
-# ─────────────────────────────────────────────────────────────────────────────
+# ===========================================================================
+# ENTRY POINT
+# ===========================================================================
 
-@app.route("/api/status", methods=["GET"])
-def status():
-    return jsonify({
-        "status": "ok",
-        "avl": _tree_to_response(
-            storage.get_current_avl_root(), "AVL", avl_tree.rotation_count
-        ),
-        "bst": _tree_to_response(storage.get_current_bst_root(), "BST"),
-    }), 200
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

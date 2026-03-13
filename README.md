@@ -1,114 +1,67 @@
 # Proyecto1EstructuraDeDatos
 
-## SkyBalance AVL - Sistema de Gestión Aérea
+## Estado actual (lo que ya esta implementado)
 
-Este proyecto implementa un sistema de gestión aérea utilizando un Árbol AVL como estructura de datos principal.
+Esta etapa del proyecto ya tiene implementadas y probadas las funcionalidades base del modulo AVL.
 
-## Estructura del Proyecto
+### 1 Carga inicial desde JSON (sin ruta fija)
 
-```
-src/
-├── acceso_datos/          # Capa de acceso a datos
-│   ├── DataLoader.py
-│   ├── DataPersistence.py
-│   ├── DataStorage.py
-│   └── VersionManager.py
-├── modelos/               # Modelos de datos
-│   ├── AVLTree.py
-│   ├── FlightNode.py
-│   └── __init__.py
-├── negocio/               # Lógica de negocio y API web
-│   └── app.py
-└── presentacion/          # Interfaz de usuario
-    ├── estilos/
-    │   ├── styles.css
-    │   └── script.js
-    └── vistas/
-        └── index.html
-```
+- La carga se hace desde selector de archivo (explorador de archivos).
+- Se soportan los 2 modos requeridos:
+	- Topologia: reconstruye respetando padres e hijos del JSON.
+	- Insercion: inserta vuelo por vuelo en AVL y en BST para comparacion.
 
-## Instalación y Ejecución
+Archivos principales:
+- `src/acceso_datos/DataLoader.py`
+- `src/acceso_datos/DataStorage.py`
 
-### Prerrequisitos
+### 2 AVL + BST en modo insercion
 
-- Python 3.8 o superior
-- pip
+- En modo insercion se construyen ambos arboles con el mismo orden de insercion.
+- El BST se mantiene como referencia visual/comparativa.
+- El AVL mantiene balance automatico.
 
-### Instalación
+Archivos principales:
+- `src/modelos/AVLTree.py`
+- `src/modelos/BST.py`
+- `src/acceso_datos/DataStorage.py`
 
-1. Clona el repositorio:
-   ```bash
-   git clone <url-del-repositorio>
-   cd Proyecto1EstructuraDeDatos
-   ```
+### 3 CRUD y logica de negocio del AVL
 
-2. Instala las dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Insercion de vuelos.
+- Modificacion de vuelos.
+- Eliminacion individual de nodos.
+- Cancelacion en cascada (vuelo + toda su descendencia), diferente de eliminacion individual.
 
-### Ejecución
+Archivo principal:
+- `src/negocio/AVLTreeManager.py`
 
-Para ejecutar la aplicación web:
+### 4 Modo estres + rebalanceo global
 
-```bash
-python src/negocio/app.py
-```
+- Modo normal: balanceo en cada insercion.
+- Modo estres: difiere balanceo durante inserciones.
+- `global_rebalance()` aplica rebalanceo masivo al final.
 
-La aplicación estará disponible en `http://localhost:5000`
+Archivo principal:
+- `src/modelos/AVLTree.py`
 
-## Funcionalidades Implementadas
+### 5 Versionado persistente
 
-### Interfaz Web
-- **Visualización del Árbol**: Gráfico interactivo del árbol AVL usando D3.js
-- **Gestión de Vuelos**: Agregar, editar, eliminar y cancelar vuelos
-- **Modo Estrés**: Visualización del árbol sin balanceo automático
-- **Sistema de Penalización**: Nodos críticos marcados visualmente
-- **Auditoría AVL**: Verificación de la propiedad AVL en modo estrés
-- **Versionado**: Guardar y restaurar versiones del árbol
-- **Simulación Concurrente**: Procesamiento de colas de inserciones
-- **Métricas en Tiempo Real**: Altura, rotaciones, recorridos, etc.
+- Versiones guardadas en disco (JSON por version).
+- Cada version guarda metadatos (incluye `version_name`) y snapshot del arbol.
+- Funciones disponibles: guardar, listar, info, restaurar, eliminar, exportar e importar version.
 
-### API Endpoints
+Archivo principal:
+- `src/acceso_datos/VersionManager.py`
 
-- `GET /`: Página principal
-- `POST /api/load-tree`: Cargar árbol desde JSON
-- `GET /api/export-tree`: Exportar árbol a JSON
-- `POST /api/add-flight`: Agregar vuelo
-- `PUT /api/edit-flight`: Editar vuelo
-- `DELETE /api/delete-flight/<code>`: Eliminar vuelo
-- `DELETE /api/cancel-flight/<code>`: Cancelar vuelo (eliminar subárbol)
-- `POST /api/toggle-stress-mode`: Alternar modo estrés
-- `GET /api/audit-avl`: Realizar auditoría AVL
+### 6 Pila de retroceso (Ctrl+Z)
 
-## Uso
+- Se guarda snapshot antes de acciones mutantes.
+- Se puede deshacer: insercion, eliminacion, modificacion y cancelacion.
+- API de negocio:
+	- `can_undo()`
+	- `undo_last_action()`
 
-1. Abre la aplicación en tu navegador
-2. Carga un archivo JSON con la estructura del árbol o crea vuelos manualmente
-3. Gestiona los vuelos usando los controles de la interfaz
-4. Explora las diferentes funcionalidades como modo estrés, auditoría, etc.
+Archivo principal:
+- `src/negocio/AVLTreeManager.py`
 
-## Desarrollo
-
-### Arquitectura
-- **Backend**: Flask (Python)
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Visualización**: D3.js
-- **Estructura de Datos**: AVL Tree personalizado
-
-### Extensiones
-Para desarrollo, se recomienda instalar:
-- VS Code con extensiones de Python y HTML/CSS/JS
-- Live Server para desarrollo frontend
-- Python extension para debugging
-
-## Contribución
-
-1. Crea una rama para tu feature
-2. Implementa los cambios
-3. Ejecuta pruebas
-4. Crea un pull request
-
-## Licencia
-
-Este proyecto es parte del curso de Estructuras de Datos.
