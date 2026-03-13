@@ -316,6 +316,13 @@ document.getElementById("editFlightBtn").addEventListener("click", async () => {
 
   // Remove flight_code from the update payload (it is sent separately)
   const updated_data = { ...payload };
+  const editedCode = payload.flight_code.trim().toUpperCase();
+  const currentCode = selectedCode.trim().toUpperCase();
+
+  if (editedCode !== currentCode) {
+    updated_data.new_flight_code = editedCode;
+  }
+
   delete updated_data.flight_code;
 
   try {

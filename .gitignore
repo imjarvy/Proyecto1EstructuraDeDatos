@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .vscode/
 .idea/
+CONTEXTO_PROYECTO.md
+probar_controller.py
+probar_queue.py
+/versions
+/.venv

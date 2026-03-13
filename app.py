@@ -315,22 +315,32 @@ def _find_least_profitable(node, depth: int):
     def profitability(n):
         return n.passengers * n.final_price - n.promotion
 
-    best   = node
-    best_p = profitability(node)
-    best_d = depth
+    def _find_least_profitable_with_depth(current, current_depth: int):
+        if current is None:
+            return None
 
-    for child, d in [(node.left, depth + 1), (node.right, depth + 1)]:
-        candidate = _find_least_profitable(child, d)
-        if candidate is None:
-            continue
-        cand_p = profitability(candidate)
-        if (cand_p < best_p
-                or (cand_p == best_p and d > best_d)
-                or (cand_p == best_p and d == best_d
-                    and candidate.flight_code > best.flight_code)):
-            best, best_p, best_d = candidate, cand_p, d
+        best   = current
+        best_p = profitability(current)
+        best_d = current_depth
 
-    return best
+        for child in (current.left, current.right):
+            candidate = _find_least_profitable_with_depth(child, current_depth + 1)
+            if candidate is None:
+                continue
+
+            cand_node, cand_depth = candidate
+            cand_p = profitability(cand_node)
+
+            if (cand_p < best_p
+                    or (cand_p == best_p and cand_depth > best_d)
+                    or (cand_p == best_p and cand_depth == best_d
+                        and cand_node.flight_code > best.flight_code)):
+                best, best_p, best_d = cand_node, cand_p, cand_depth
+
+        return best, best_d
+
+    result = _find_least_profitable_with_depth(node, depth)
+    return result[0] if result else None
 
 
 # ===========================================================================
