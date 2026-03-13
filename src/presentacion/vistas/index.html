@@ -1,136 +1,206 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SkyBalance AVL - Sistema de Gestión Aérea</title>
-    <link rel="stylesheet" href="../estilos/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyBalance AVL - Sistema de Gestión Aérea</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/estilos/styles.css" />
 </head>
 <body>
-    <header>
-        <h1>SkyBalance AVL</h1>
-        <h2>Sistema de Gestión Aérea</h2>
-        <div id="headerButtons">
-            <button id="loadJsonBtn">Cargar JSON</button>
-            <button id="exportTreeBtn">Exportar JSON</button>
-            <button id="stressModeBtn">Activar Modo Estrés</button>
-            <button id="globalRebalanceBtn">Rebalanceo Global</button>
-            <button id="undoBtn" disabled>↩ Deshacer</button>
-            <button id="deleteLeastProfitable">Eliminar Menor Rentabilidad</button>
-        </div>
-    </header>
 
-    <main>
-        <!-- Tree visualisation -->
-        <section id="treeSection">
-            <h3>Visualización del Árbol AVL</h3>
-            <div id="treeContainer">
-                <svg id="treeSvg"></svg>
-            </div>
-        </section>
+<!-- ======= HEADER ======= -->
+<header id="appHeader">
+  <div class="header-brand">
+    <span class="brand-icon">✈</span>
+    <div>
+      <h1>SkyBalance<span class="brand-avl">AVL</span></h1>
+      <p class="brand-sub">Sistema de Gestión Aérea</p>
+    </div>
+  </div>
 
-        <!-- Tree properties -->
-        <section id="propertiesSection">
-            <h3>Propiedades del Árbol</h3>
-            <div id="properties">
-                <p><strong>Raíz:</strong>              <span id="rootValue">-</span></p>
-                <p><strong>Altura:</strong>             <span id="heightValue">0</span></p>
-                <p><strong>Hojas:</strong>              <span id="leavesValue">0</span></p>
-                <p><strong>Nodos:</strong>              <span id="nodesValue">0</span></p>
-                <p><strong>Rotaciones Totales:</strong> <span id="rotationsValue">0</span></p>
-            </div>
-        </section>
+  <!-- Global action buttons -->
+  <div id="headerButtons">
+    <button id="loadJsonBtn">Cargar JSON</button>
+    <button id="exportTreeBtn">Exportar JSON</button>
+    <button id="stressModeBtn">Activar Modo Estrés</button>
+    <button id="globalRebalanceBtn">Rebalanceo Global</button>
+    <button id="undoBtn" disabled>↩ Deshacer</button>
+    <button id="deleteLeastProfitable">Eliminar Menor Rentabilidad</button>
+  </div>
+</header>
 
-        <!-- Flight CRUD form -->
-        <section id="controlsSection">
-            <h3>Gestión de Vuelos</h3>
-            <div id="flightForm">
-                <input type="text"   id="flightCode"   placeholder="Código de Vuelo" required>
-                <input type="text"   id="origin"        placeholder="Origen"          required>
-                <input type="text"   id="destination"   placeholder="Destino"         required>
-                <input type="number" id="basePrice"     placeholder="Precio Base"     step="0.01" required>
-                <input type="number" id="passengers"    placeholder="Pasajeros"       value="0">
-                <input type="number" id="promotion"     placeholder="Promoción"       step="0.01" value="0">
-                <input type="text"   id="alert"         placeholder="Alerta">
-                <select id="priority">
-                    <option value="1">1 - Baja</option>
-                    <option value="2">2</option>
-                    <option value="3" selected>3 - Media</option>
-                    <option value="4">4</option>
-                    <option value="5">5 - Alta</option>
-                </select>
-                <button id="addFlightBtn">Agregar Vuelo</button>
-                <button id="editFlightBtn"   disabled>Editar Vuelo</button>
-                <button id="deleteFlightBtn" disabled>Eliminar Vuelo</button>
-                <button id="cancelFlightBtn" disabled>Cancelar Vuelo</button>
-            </div>
-        </section>
+<!-- Banner shown only while stress mode is active -->
+<div id="stressBanner" class="stress-banner hidden">
+  ⚡ MODO ESTRÉS ACTIVO — balanceo diferido
+</div>
 
-        <!-- Analytical metrics -->
-        <section id="metricsSection">
-            <h3>Métricas Analíticas</h3>
-            <div id="metrics">
-                <p><strong>Altura Actual:</strong>           <span id="currentHeight">0</span></p>
-                <p><strong>Rotaciones LL:</strong>           <span id="llRotations">0</span></p>
-                <p><strong>Rotaciones RR:</strong>           <span id="rrRotations">0</span></p>
-                <p><strong>Rotaciones LR:</strong>           <span id="lrRotations">0</span></p>
-                <p><strong>Rotaciones RL:</strong>           <span id="rlRotations">0</span></p>
-                <p><strong>Cancelaciones Masivas:</strong>   <span id="massCancellations">0</span></p>
-                <p><strong>Recorrido en Anchura:</strong>    <span id="breadthTraversal">-</span></p>
-                <p><strong>Recorrido en Profundidad:</strong><span id="depthTraversal">-</span></p>
-            </div>
-        </section>
+<!-- ======= MAIN CONTENT ======= -->
+<main>
 
-        <!-- Critical depth / penalisation -->
-        <section id="penalizationSection">
-            <h3>Sistema de Penalización</h3>
-            <label for="criticalDepth">Profundidad Crítica:</label>
-            <input  type="number" id="criticalDepth" value="5" min="1">
-            <button id="updateCriticalDepthBtn">Actualizar</button>
-        </section>
-    </main>
-
-    <!-- ===== MODALS ===== -->
-
-    <!-- Load JSON modal -->
-    <div id="jsonModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Cargar Archivo JSON</h3>
-            <select id="loadType">
-                <option value="topology">Topología</option>
-                <option value="insertion">Inserción</option>
-            </select>
-            <input  type="file" id="jsonFile" accept=".json">
-            <button id="loadJsonConfirmBtn">Cargar</button>
-        </div>
+  <!-- AVL tree visualisation (full width) -->
+  <section id="treeSection">
+    <div class="section-header">
+      <h3>Visualización del Árbol AVL</h3>
+      <div class="tree-legend">
+        <span class="legend-item"><span class="dot dot-normal"></span>Normal</span>
+        <span class="legend-item"><span class="dot dot-critical"></span>Crítico</span>
+        <span class="legend-item"><span class="dot dot-root"></span>Raíz</span>
+      </div>
+    </div>
+    <div id="treeContainer">
+      <!-- Placeholder shown when no tree is loaded -->
+      <div id="emptyState">
+        <p>🛫 Carga un archivo JSON para visualizar el árbol</p>
+      </div>
+      <svg id="treeSvg"></svg>
     </div>
 
-    <!-- Versions modal -->
-    <div id="versionsModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Gestión de Versiones</h3>
-            <input  type="text" id="versionName" placeholder="Nombre de la Versión">
-            <button id="saveVersionBtn">Guardar Versión</button>
-            <button id="showVersionsBtn">Ver Versiones</button>
-            <ul id="versionsList"></ul>
-        </div>
+    <!-- BST comparison panel — only shown in insertion mode -->
+    <div id="bstSection" class="hidden">
+      <div class="section-header" style="margin-top:1.5rem">
+        <h3>Árbol BST (sin balanceo automático)</h3>
+      </div>
+      <div id="bstContainer">
+        <svg id="bstSvg"></svg>
+      </div>
+      <div id="bstProperties">
+        <p><strong>Raíz BST:</strong> <span id="bstRoot">—</span></p>
+        <p><strong>Altura:</strong>   <span id="bstHeight">0</span></p>
+        <p><strong>Hojas:</strong>    <span id="bstLeaves">0</span></p>
+        <p><strong>Nodos:</strong>    <span id="bstNodes">0</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tree structural properties -->
+  <section id="propertiesSection">
+    <h3>Propiedades del Árbol</h3>
+    <div id="properties">
+      <p><strong>Raíz:</strong>              <span id="rootValue">-</span></p>
+      <p><strong>Altura:</strong>             <span id="heightValue">0</span></p>
+      <p><strong>Hojas:</strong>              <span id="leavesValue">0</span></p>
+      <p><strong>Nodos:</strong>              <span id="nodesValue">0</span></p>
+      <p><strong>Rotaciones Totales:</strong> <span id="rotationsValue">0</span></p>
+    </div>
+  </section>
+
+  <!-- Flight CRUD form -->
+  <section id="controlsSection">
+    <h3>Gestión de Vuelos</h3>
+    <div id="flightForm">
+      <input type="text"   id="flightCode"   placeholder="Código de Vuelo" />
+      <input type="text"   id="origin"        placeholder="Origen" />
+      <input type="text"   id="destination"   placeholder="Destino" />
+      <input type="number" id="basePrice"     placeholder="Precio Base" step="0.01" />
+      <input type="number" id="passengers"    placeholder="Pasajeros" value="0" />
+      <input type="number" id="promotion"     placeholder="Promoción (0–1)" step="0.01" value="0" />
+      <input type="text"   id="alert"         placeholder="Alerta" />
+      <select id="priority">
+        <option value="1">1 - Baja</option>
+        <option value="2">2</option>
+        <option value="3" selected>3 - Media</option>
+        <option value="4">4</option>
+        <option value="5">5 - Alta</option>
+      </select>
+      <!-- Edit/Delete/Cancel require a node to be selected first -->
+      <button id="addFlightBtn">Agregar Vuelo</button>
+      <button id="editFlightBtn"   disabled>Editar Vuelo</button>
+      <button id="deleteFlightBtn" disabled>Eliminar Vuelo</button>
+      <button id="cancelFlightBtn" disabled>Cancelar Vuelo</button>
     </div>
 
-    <!-- AVL audit modal -->
-    <div id="auditModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Reporte de Auditoría AVL</h3>
-            <!-- Audit button only shown in stress mode (spec §7) -->
-            <button id="auditAvlBtn" style="display:none;">Verificar Propiedad AVL</button>
-            <div id="auditReport"></div>
-        </div>
+    <!-- Node detail panel — appears after clicking a node in the tree -->
+    <div id="nodeDetail" class="hidden">
+      <h4>Detalle del Nodo Seleccionado</h4>
+      <div id="nodeDetailContent"></div>
     </div>
+  </section>
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- type="module" required for the ES-module import of StorageManager -->
-    <script type="module" src="script.js"></script>
+  <!-- Analytical metrics and traversal orders -->
+  <section id="metricsSection">
+    <h3>Métricas Analíticas</h3>
+    <div id="metrics">
+      <p><strong>Altura Actual:</strong>           <span id="currentHeight">0</span></p>
+      <p><strong>Rotaciones LL:</strong>           <span id="llRotations">0</span></p>
+      <p><strong>Rotaciones RR:</strong>           <span id="rrRotations">0</span></p>
+      <p><strong>Rotaciones LR:</strong>           <span id="lrRotations">0</span></p>
+      <p><strong>Rotaciones RL:</strong>           <span id="rlRotations">0</span></p>
+      <p><strong>Cancelaciones Masivas:</strong>   <span id="massCancellations">0</span></p>
+      <p><strong>Recorrido en Anchura:</strong>    <span id="breadthTraversal">-</span></p>
+      <p><strong>Recorrido en Profundidad:</strong><span id="depthTraversal">-</span></p>
+    </div>
+  </section>
+
+  <!-- Critical depth penalisation system (spec §6) -->
+  <section id="penalizationSection">
+    <h3>Sistema de Penalización</h3>
+    <label for="criticalDepth">Profundidad Crítica:</label>
+    <input  type="number" id="criticalDepth" value="5" min="1" />
+    <button id="updateCriticalDepthBtn">Actualizar</button>
+  </section>
+
+  <!-- Version management -->
+  <section id="versionsSection">
+    <h3>Gestión de Versiones</h3>
+    <div id="versionsControls">
+      <input type="text" id="versionName" placeholder="Nombre de la Versión" />
+      <button id="saveVersionBtn">Guardar Versión</button>
+      <button id="showVersionsBtn">Ver Versiones</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ======= TOAST NOTIFICATION ======= -->
+<div id="toast" class="toast"></div>
+
+<!-- ======= MODALS ======= -->
+
+<!-- Modal: load JSON file -->
+<div id="jsonModal" class="modal">
+  <div class="modal-content">
+    <span class="close" data-close="jsonModal">&times;</span>
+    <h3>Cargar Archivo JSON</h3>
+    <label>Tipo de reconstrucción:
+      <select id="loadType">
+        <option value="topology">Topología</option>
+        <option value="insertion">Inserción</option>
+      </select>
+    </label>
+    <label class="file-upload-label">
+      <span id="fileLabel">📂 Seleccionar archivo .json</span>
+      <input type="file" id="jsonFile" accept=".json" />
+    </label>
+    <button id="loadJsonConfirmBtn">Cargar</button>
+  </div>
+</div>
+
+<!-- Modal: saved versions list -->
+<div id="versionsModal" class="modal">
+  <div class="modal-content">
+    <span class="close" data-close="versionsModal">&times;</span>
+    <h3>Versiones Guardadas</h3>
+    <ul id="versionsList"></ul>
+  </div>
+</div>
+
+<!-- Modal: AVL audit report
+     The audit button is hidden by default and only shown during stress mode (spec §7) -->
+<div id="auditModal" class="modal">
+  <div class="modal-content">
+    <span class="close" data-close="auditModal">&times;</span>
+    <h3>Reporte de Auditoría AVL</h3>
+    <button id="auditAvlBtn" style="display:none;">Verificar Propiedad AVL</button>
+    <div id="auditReport"></div>
+  </div>
+</div>
+
+<!-- D3.js must be loaded before script.js -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<!-- Application logic (src/negocio/script.js) -->
+<script src="/negocio/script.js"></script>
+
 </body>
 </html>

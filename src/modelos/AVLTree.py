@@ -6,7 +6,6 @@ classroom implementation to work with FlightNode objects and integrate with
 the DataStorage persistence system.
 """
 
-from platform import node
 from typing import Optional, List, Dict, Any
 from src.modelos.FlightNode import FlightNode
 
@@ -22,13 +21,21 @@ class AVLTree:
         root (FlightNode): Root node of the AVL tree
         rotation_count (Dict): Counter for rotation types (LL, RR, LR, RL)
         cascade_rebalance_count (int): Count of cascade rebalancing operations
+        stress_mode (bool): Whether insertions defer rotations until a global rebalance
     """
     
-    def __init__(self):
-        """Initialize empty AVL tree."""
+    def __init__(self, stress_mode: bool = False):
+        """
+        Initialize an empty AVL tree.
+
+        Args:
+            stress_mode (bool): When True, insertions update metadata but skip
+                rotations until a global rebalance is requested.
+        """
         self.root: Optional[FlightNode] = None
         self.rotation_count = {"LL": 0, "RR": 0, "LR": 0, "RL": 0}
         self.cascade_rebalance_count = 0
+        self.stress_mode = stress_mode
     
     # ============================================================================
     # INSERTION OPERATIONS
@@ -37,6 +44,10 @@ class AVLTree:
     def insert(self, flight_node: FlightNode) -> FlightNode:
         """
         Insert a flight node into the AVL tree.
+
+        In normal mode the tree is rebalanced immediately after the insertion.
+        In stress mode only heights and balance factors are refreshed; rotations
+        are deferred until ``global_rebalance`` is called.
         
         Args:
             flight_node (FlightNode): Node to insert.
@@ -55,7 +66,11 @@ class AVLTree:
     
     def _insert_recursive(self, current: FlightNode, new_node: FlightNode) -> None:
         """
-        Recursively insert node maintaining BST property.
+        Recursively insert a node while preserving BST ordering.
+
+        Once the new node is linked, the method either performs AVL rebalancing
+        immediately or only refreshes node metadata, depending on the current
+        operating mode.
         
         Args:
             current (FlightNode): Current node being evaluated.
@@ -69,17 +84,39 @@ class AVLTree:
             if current.left is None:
                 current.left = new_node
                 new_node.parent = current
-                self._check_balance(current)
+                if self.stress_mode:
+                    self._refresh_metadata_upwards(current)
+                else:
+                    self._check_balance(current)
             else:
                 self._insert_recursive(current.left, new_node)
         else:
             if current.right is None:
                 current.right = new_node
                 new_node.parent = current
-                self._check_balance(current)
+                if self.stress_mode:
+                    self._refresh_metadata_upwards(current)
+                else:
+                    self._check_balance(current)
             else:
                 self._insert_recursive(current.right, new_node)
-    
+
+    def set_stress_mode(self, enabled: bool, rebalance_when_disabling: bool = False) -> None:
+        """
+        Enable or disable stress mode for future insertions.
+
+        Args:
+            enabled (bool): ``True`` to defer rotations on insert, ``False`` to
+                restore immediate balancing.
+            rebalance_when_disabling (bool): When ``True`` and the tree leaves
+                stress mode, ``global_rebalance`` is executed before returning.
+        """
+        was_stress_mode = self.stress_mode
+        self.stress_mode = enabled
+
+        if was_stress_mode and not enabled and rebalance_when_disabling:
+            self.global_rebalance()
+
     # ============================================================================
     # SEARCH OPERATIONS
     # ============================================================================
@@ -164,7 +201,13 @@ class AVLTree:
         return result
     
     def _pre_order_traversal_recursive(self, current: Optional[FlightNode], result: List[FlightNode]) -> None:
-        """Recursively perform pre-order traversal."""
+        """
+        Recursively perform pre-order traversal.
+
+        Args:
+            current (FlightNode): Current subtree root.
+            result (List[FlightNode]): Accumulator list for visited nodes.
+        """
         if current is None:
             return
         
@@ -191,7 +234,13 @@ class AVLTree:
         return result
     
     def _in_order_traversal_recursive(self, current: Optional[FlightNode], result: List[FlightNode]) -> None:
-        """Recursively perform in-order traversal."""
+        """
+        Recursively perform in-order traversal.
+
+        Args:
+            current (FlightNode): Current subtree root.
+            result (List[FlightNode]): Accumulator list for visited nodes.
+        """
         if current is None:
             return
         
@@ -218,7 +267,13 @@ class AVLTree:
         return result
     
     def _post_order_traversal_recursive(self, current: Optional[FlightNode], result: List[FlightNode]) -> None:
-        """Recursively perform post-order traversal."""
+        """
+        Recursively perform post-order traversal.
+
+        Args:
+            current (FlightNode): Current subtree root.
+            result (List[FlightNode]): Accumulator list for visited nodes.
+        """
         if current is None:
             return
         
@@ -317,15 +372,6 @@ class AVLTree:
         
         return self.get_leaf_count(node.left) + self.get_leaf_count(node.right)
     
-    def get_tree_leaf_count(self) -> int:
-        """
-        Get total leaf count in tree.
-        
-        Returns:
-            int: Total leaf count.
-        """
-        return self.get_leaf_count(self.root)
-    
     def get_node_depth(self, flight_code: str) -> int:
         """
         Get depth of a specific node (distance from root).
@@ -376,17 +422,19 @@ class AVLTree:
                 "leaf_count": 0,
                 "node_count": 0,
                 "total_rotations": sum(self.rotation_count.values()),
-                "rotation_breakdown": self.rotation_count.copy()
+                "rotation_breakdown": self.rotation_count.copy(),
+                "stress_mode": self.stress_mode
             }
         
         return {
             "tree_type": "AVL",
             "root": self.root.flight_code,
             "height": self.get_tree_height(),
-            "leaf_count": self.get_tree_leaf_count(),
+            "leaf_count": self.get_leaf_count(self.root),
             "node_count": self.get_tree_weight(),
             "total_rotations": sum(self.rotation_count.values()),
-            "rotation_breakdown": self.rotation_count.copy()
+            "rotation_breakdown": self.rotation_count.copy(),
+            "stress_mode": self.stress_mode
         }
     
     # ============================================================================
@@ -430,6 +478,58 @@ class AVLTree:
             self._delete_one_child_node(node)
         elif deletion_case == 3:
             self._delete_two_child_node(node)
+
+    def delete_subtree(self, flight_code: str) -> int:
+        """
+        Delete a node and its entire descendant subtree.
+
+        This operation is used for flight cancellation rules where the selected
+        flight and all dependent flights below it must be removed together.
+
+        Args:
+            flight_code (str): Root code of the subtree to remove.
+
+        Returns:
+            int: Number of removed nodes (0 when code is not found).
+        """
+        if self.root is None:
+            print("Tree is empty.")
+            return 0
+
+        target = self.search(flight_code)
+        if target is None:
+            print(f"Flight {flight_code} not found in tree.")
+            return 0
+
+        removed_count = self._count_subtree_nodes(target)
+        parent = target.parent
+
+        if parent is None:
+            self.root = None
+        else:
+            if parent.left is target:
+                parent.left = None
+            else:
+                parent.right = None
+            self._check_balance(parent)
+
+        target.parent = None
+        return removed_count
+
+    def _count_subtree_nodes(self, node: Optional[FlightNode]) -> int:
+        """
+        Count total nodes in a subtree.
+
+        Args:
+            node (FlightNode): Subtree root.
+
+        Returns:
+            int: Number of nodes in the subtree.
+        """
+        if node is None:
+            return 0
+
+        return 1 + self._count_subtree_nodes(node.left) + self._count_subtree_nodes(node.right)
     
     def _identify_deletion_case(self, node: FlightNode) -> int:
         """
@@ -446,7 +546,12 @@ class AVLTree:
             return 2  # One child
     
     def _delete_leaf_node(self, node: FlightNode) -> None:
-        """Delete a leaf node."""
+        """
+        Delete a node that has no children.
+
+        Args:
+            node (FlightNode): Leaf node to remove.
+        """
         if node.parent is None:
             self.root = None
         else:
@@ -458,7 +563,15 @@ class AVLTree:
             self._check_balance(node.parent)
     
     def _delete_one_child_node(self, node: FlightNode) -> None:
-        """Delete a node with one child."""
+        """
+        Delete a node that has exactly one child.
+
+        The child takes the deleted node's place and the tree is rechecked for
+        balance from the former parent.
+
+        Args:
+            node (FlightNode): Node to remove.
+        """
         child_node = node.left if node.left is not None else node.right
         assert child_node is not None
         
@@ -475,7 +588,15 @@ class AVLTree:
             self._check_balance(node.parent)
     
     def _delete_two_child_node(self, node: FlightNode) -> None:
-        """Delete a node with two children."""
+        """
+        Delete a node that has two children.
+
+        The in-order predecessor is copied into the target node and then the
+        predecessor is removed as a simpler leaf/one-child case.
+
+        Args:
+            node (FlightNode): Node to remove.
+        """
         # Find predecessor (rightmost in left subtree)
         predecessor = node.left
         assert predecessor is not None
@@ -512,7 +633,34 @@ class AVLTree:
         """
         if node is None: return
         self._check_balance_recursive(node) 
-    
+
+    def _refresh_node_metadata(self, node: FlightNode) -> None:
+        """
+        Recompute height and balance factor for a single node.
+
+        Args:
+            node (FlightNode): Node whose cached metadata will be updated.
+        """
+        left_height = self.get_height(node.left)
+        right_height = self.get_height(node.right)
+        node.height = max(left_height, right_height) + 1
+        node.balance_factor = left_height - right_height
+
+    def _refresh_metadata_upwards(self, node: Optional[FlightNode]) -> None:
+        """
+        Refresh metadata from a node up to the root without rotating.
+
+        This is used in stress mode so the tree still reports correct heights
+        and balance factors even though structural balancing is postponed.
+
+        Args:
+            node (FlightNode): Starting node for the upward refresh.
+        """
+        current = node
+        while current is not None:
+            self._refresh_node_metadata(current)
+            current = current.parent
+
     def _check_balance_recursive(self, node: Optional[FlightNode]) -> None:
         """
         Recursively check and fix balance factors.
@@ -523,14 +671,8 @@ class AVLTree:
         if node is None:
             return
         
-        # Update height
-        left_height = self.get_height(node.left)
-        right_height = self.get_height(node.right)
-        node.height = max(left_height, right_height) + 1
-        
-        # Calculate balance factor
-        bf = self._get_balance_factor(node)
-        node.balance_factor = bf
+        self._refresh_node_metadata(node)
+        bf = node.balance_factor
         
         # Check if rebalancing needed
         if bf > 1 or bf < -1:
@@ -700,7 +842,11 @@ class AVLTree:
             return 0
         
         initial_rotation_count = sum(self.rotation_count.values())
-        self._global_rebalance_recursive(self.root)
+
+        while any(abs(n.balance_factor) > 1 for n in self.breadth_first_search()):
+            self.cascade_rebalance_count += 1
+            self._global_rebalance_recursive(self.root)
+
         final_rotation_count = sum(self.rotation_count.values())
         
         return final_rotation_count - initial_rotation_count
@@ -724,8 +870,8 @@ class AVLTree:
             self._global_rebalance_recursive(node.right)
         
         # Check and fix balance at this node
-        bf = self._get_balance_factor(node)
-        node.balance_factor = bf
+        self._refresh_node_metadata(node)
+        bf = node.balance_factor
         
         if bf > 1 or bf < -1:
             balance_case = self._get_balance_case(node, bf)
@@ -744,38 +890,3 @@ class AVLTree:
                 assert right_child is not None
                 self._rotate_right(right_child)
                 self._rotate_left(node)
-    
-    # ============================================================================
-    # TREE VISUALIZATION
-    # ============================================================================
-    
-    def print_tree(self) -> None:
-        """Print tree structure in ASCII format."""
-        if self.root is None:
-            print("Tree is empty.")
-        else:
-            self._print_tree_recursive(self.root, "", True)
-    
-    def _print_tree_recursive(self, node: Optional[FlightNode], prefix: str, is_left: bool) -> None:
-        """
-        Recursively print tree structure.
-        
-        Args:
-            node (FlightNode): Current node being printed.
-            prefix (str): Current prefix for formatting.
-            is_left (bool): Whether node is left child.
-        """
-        if node is not None:
-            # Print right subtree
-            if node.right:
-                new_prefix = prefix + ("│   " if is_left else "    ")
-                self._print_tree_recursive(node.right, new_prefix, False)
-            
-            # Print current node
-            connector = "└── " if is_left else "┌── "
-            print(prefix + connector + f"{node.flight_code} (BF:{node.balance_factor}, H:{node.height})")
-            
-            # Print left subtree
-            if node.left:
-                new_prefix = prefix + ("    " if is_left else "│   ")
-                self._print_tree_recursive(node.left, new_prefix, True)
