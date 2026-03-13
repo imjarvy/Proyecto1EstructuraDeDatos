@@ -7,7 +7,8 @@ modules: AVLTree, AVLTreeManager, BST, DataPersistence, VersionManager.
 """
 
 import json
-import tempfile
+import os
+import sys
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
@@ -659,8 +660,8 @@ def delete_version():
 # ECONOMIC ELIMINATION  — spec §8
 # ---------------------------------------------------------------------------
 
-@app.route("/api/delete/<flight_code>", methods=["DELETE"])
-def delete_flight(flight_code):
+@app.route("/api/delete-least-profitable", methods=["POST"])
+def delete_least_profitable():
     """
     Find and cancel the least-profitable flight (and its entire subtree).
 
@@ -692,4 +693,4 @@ def delete_flight(flight_code):
 # ===========================================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

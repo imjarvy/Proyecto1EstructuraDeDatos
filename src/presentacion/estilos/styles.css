@@ -231,3 +231,18 @@ section h3 {
         grid-template-columns: 1fr;
     }
 }
+
+.hidden {
+    display: none !important;
+}
+
+.stress-banner {
+    background: #ffefc2;
+    color: #8a4b00;
+    border-top: 1px solid #ffd27a;
+    border-bottom: 1px solid #ffd27a;
+    text-align: center;
+    font-weight: 700;
+    padding: 0.6rem 1rem;
+}
+

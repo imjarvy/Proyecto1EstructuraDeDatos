@@ -511,7 +511,10 @@ class AVLTree:
                 parent.left = None
             else:
                 parent.right = None
-            self._check_balance(parent)
+            if self.stress_mode:
+                self._refresh_metadata_upwards(parent)
+            else:
+                self._check_balance(parent)
 
         target.parent = None
         return removed_count
@@ -555,12 +558,15 @@ class AVLTree:
         if node.parent is None:
             self.root = None
         else:
-            if node.flight_code < node.parent.flight_code:
+            if node.parent.left is node:
                 node.parent.left = None
             else:
                 node.parent.right = None
-            
-            self._check_balance(node.parent)
+
+            if self.stress_mode:
+                self._refresh_metadata_upwards(node.parent)
+            else:
+                self._check_balance(node.parent)
     
     def _delete_one_child_node(self, node: FlightNode) -> None:
         """
@@ -579,13 +585,16 @@ class AVLTree:
             self.root = child_node
             child_node.parent = None
         else:
-            if node.flight_code < node.parent.flight_code:
+            if node.parent.left is node:
                 node.parent.left = child_node
             else:
                 node.parent.right = child_node
-            
+
             child_node.parent = node.parent
-            self._check_balance(node.parent)
+            if self.stress_mode:
+                self._refresh_metadata_upwards(node.parent)
+            else:
+                self._check_balance(node.parent)
     
     def _delete_two_child_node(self, node: FlightNode) -> None:
         """

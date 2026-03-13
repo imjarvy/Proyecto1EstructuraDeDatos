@@ -223,3 +223,4 @@ class BST:
             "leaf_count": self.get_leaf_count(self.root),
             "node_count": self.get_tree_weight()
         }
+        
