@@ -132,7 +132,7 @@ class AVLTree:
             FlightNode: Found node, or None if not found.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            return None
         
         return self._search_recursive(self.root, flight_code)
     

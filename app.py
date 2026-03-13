@@ -17,8 +17,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from src.modelos.AVLTree import AVLTree
 from src.modelos.BST import BST
-from src.modelos.FlightNode import FlightNode
 from src.negocio.AVLTreeManager import AVLTreeManager
+from src.negocio.TreeAnalysisManager import TreeAnalysisManager
+from src.negocio.TreeSerializationManager import TreeSerializationManager
 from src.acceso_datos.DataPersistence import DataPersistence
 from src.acceso_datos.VersionManager import VersionManager
 
@@ -48,6 +49,8 @@ bst_tree       = BST()              # plain BST used for insertion-mode comparis
 persistence    = DataPersistence()
 versions       = VersionManager()
 critical_depth = 5                  # default critical depth threshold
+analysis       = TreeAnalysisManager()
+serialization  = TreeSerializationManager()
 
 
 # ===========================================================================
@@ -155,194 +158,6 @@ def _bst_payload() -> dict:
     }
 
 
-def _reconstruct_from_topology(data: dict) -> bool:
-    """
-    Rebuild manager.tree from a topology-format JSON.
-
-    Expected JSON keys: 'root_code', 'tree_structure' (mapping flight codes
-    to dicts with 'flight_data', 'left_child', 'right_child').
-
-    Args:
-        data: Parsed JSON dictionary.
-
-    Returns:
-        True if reconstruction succeeded, False otherwise.
-    """
-    global manager
-    tree_structure = data.get("tree_structure")
-    root_code      = data.get("root_code")
-    if not tree_structure or not root_code:
-        return False
-
-    # Build all nodes first
-    node_map = {}
-    for code, entry in tree_structure.items():
-        node_map[code] = FlightNode.from_dict(entry["flight_data"])
-
-    root_node = node_map.get(root_code)
-    if root_node is None:
-        return False
-
-    # Establish parent-child relationships
-    for code, entry in tree_structure.items():
-        current = node_map[code]
-        lc = entry.get("left_child")
-        rc = entry.get("right_child")
-        if lc and lc in node_map:
-            current.left = node_map[lc]
-            node_map[lc].parent = current
-        if rc and rc in node_map:
-            current.right = node_map[rc]
-            node_map[rc].parent = current
-
-    new_avl       = AVLTree()
-    new_avl.root  = root_node
-    manager       = AVLTreeManager(new_avl)
-    return True
-
-
-def _reconstruct_from_insertion(data: dict) -> bool:
-    """
-    Rebuild manager.tree (AVL) and bst_tree by inserting flights one by one.
-
-    Expected JSON key: 'flights' (list of flight dicts).
-
-    Args:
-        data: Parsed JSON dictionary.
-
-    Returns:
-        True if reconstruction succeeded, False otherwise.
-    """
-    global manager, bst_tree
-    flights = data.get("flights", [])
-    if not flights:
-        return False
-
-    new_avl  = AVLTree()
-    bst_tree = BST()
-
-    for fd in flights:
-        new_avl.insert(FlightNode.from_dict(fd))
-        bst_tree.insert(FlightNode.from_dict(fd))
-
-    manager = AVLTreeManager(new_avl)
-    return True
-
-
-def _apply_depth_penalties(node, depth: int, limit: int) -> None:
-    """
-    Walk the tree and adjust final_price based on the critical depth rule.
-
-    Nodes deeper than 'limit' receive a 25% price increase on their base price.
-    Nodes at or above the limit are reset to their base price.
-
-    Args:
-        node: Current FlightNode (or None).
-        depth: Current depth of the node.
-        limit: Critical depth threshold.
-    """
-    if node is None:
-        return
-    if depth > limit:
-        node.final_price = round(node.base_price * 1.25, 2)
-    else:
-        node.final_price = node.base_price
-    _apply_depth_penalties(node.left,  depth + 1, limit)
-    _apply_depth_penalties(node.right, depth + 1, limit)
-
-
-def _audit_node(node, report: list, depth: int = 0) -> bool:
-    """
-    Recursively verify the AVL balance property on every node.
-
-    Checks that balance_factor ∈ {-1, 0, 1} and that the stored height
-    matches the actual computed height.
-
-    Args:
-        node: Current FlightNode (or None).
-        report: List to append issue dicts to.
-        depth: Current depth of the node.
-
-    Returns:
-        True if the subtree is fully valid, False otherwise.
-    """
-    if node is None:
-        return True
-
-    issues = []
-
-    if node.balance_factor not in (-1, 0, 1):
-        issues.append(
-            f"Balance factor = {node.balance_factor}, expected value in {{-1, 0, 1}}"
-        )
-
-    def _h(n):
-        return n.height if n else -1
-
-    expected_height = max(_h(node.left), _h(node.right)) + 1 if (node.left or node.right) else 0
-    if node.height != expected_height:
-        issues.append(
-            f"Stored height = {node.height}, but computed height = {expected_height}"
-        )
-
-    if issues:
-        report.append({"flight_code": node.flight_code, "depth": depth, "issues": issues})
-
-    left_ok  = _audit_node(node.left,  report, depth + 1)
-    right_ok = _audit_node(node.right, report, depth + 1)
-    return len(issues) == 0 and left_ok and right_ok
-
-
-def _find_least_profitable(node, depth: int):
-    """
-    Find the node with the lowest profitability score.
-
-    Profitability = passengers × final_price − promotion.
-    Tie-breaking rules (spec §8):
-      1. Prefer the deeper node.
-      2. If still tied, prefer the larger flight_code (lexicographic).
-
-    Args:
-        node: Current FlightNode (or None).
-        depth: Current depth of the node.
-
-    Returns:
-        The least profitable FlightNode, or None if the subtree is empty.
-    """
-    if node is None:
-        return None
-
-    def profitability(n):
-        return n.passengers * n.final_price - n.promotion
-
-    def _find_least_profitable_with_depth(current, current_depth: int):
-        if current is None:
-            return None
-
-        best   = current
-        best_p = profitability(current)
-        best_d = current_depth
-
-        for child in (current.left, current.right):
-            candidate = _find_least_profitable_with_depth(child, current_depth + 1)
-            if candidate is None:
-                continue
-
-            cand_node, cand_depth = candidate
-            cand_p = profitability(cand_node)
-
-            if (cand_p < best_p
-                    or (cand_p == best_p and cand_depth > best_d)
-                    or (cand_p == best_p and cand_depth == best_d
-                        and cand_node.flight_code > best.flight_code)):
-                best, best_p, best_d = cand_node, cand_p, cand_depth
-
-        return best, best_d
-
-    result = _find_least_profitable_with_depth(node, depth)
-    return result[0] if result else None
-
-
 # ===========================================================================
 # ROUTES
 # ===========================================================================
@@ -389,12 +204,21 @@ def load_tree():
     except json.JSONDecodeError as exc:
         return jsonify({"error": f"Invalid JSON: {exc}"}), 400
 
+    global manager, bst_tree
     if load_type == "topology":
-        ok = _reconstruct_from_topology(data)
+        rebuilt_avl = serialization.reconstruct_from_topology(data)
+        if rebuilt_avl is None:
+            return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
+        manager = AVLTreeManager(rebuilt_avl)
     else:
-        ok = _reconstruct_from_insertion(data)
+        rebuilt = serialization.reconstruct_from_insertion(data)
+        if rebuilt is None:
+            return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
+        rebuilt_avl, rebuilt_bst = rebuilt
+        manager = AVLTreeManager(rebuilt_avl)
+        bst_tree = rebuilt_bst
 
-    if not ok:
+    if manager.tree.root is None:
         return jsonify({"error": "Could not reconstruct the tree from the provided data"}), 422
 
     response = {"tree": _tree_payload()}
@@ -579,7 +403,7 @@ def audit_avl():
     Intended for use during stress mode (spec §7).
     """
     report   = []
-    is_valid = _audit_node(manager.tree.root, report)
+    is_valid = analysis.audit_node(manager.tree.root, report)
     return jsonify({"valid": is_valid, "report": report})
 
 
@@ -601,7 +425,7 @@ def update_critical_depth():
     global critical_depth
     body           = request.get_json(silent=True) or {}
     critical_depth = int(body.get("critical_depth", 5))
-    _apply_depth_penalties(manager.tree.root, 0, critical_depth)
+    analysis.apply_depth_penalties(manager.tree.root, 0, critical_depth)
     return jsonify({"critical_depth": critical_depth, "tree": _tree_payload()})
 
 
@@ -675,13 +499,13 @@ def delete_least_profitable():
     """
     Find and cancel the least-profitable flight (and its entire subtree).
 
-    Profitability = passengers × final_price − promotion.
+    Profitability = passengers × final_price.
     Tie-breaking: deepest node wins; then largest flight_code wins.
     """
     if manager.tree.root is None:
         return jsonify({"error": "Tree is empty"}), 400
 
-    target = _find_least_profitable(manager.tree.root, depth=0)
+    target = analysis.find_least_profitable(manager.tree.root, depth=0)
     if target is None:
         return jsonify({"error": "No nodes found"}), 500
 
