@@ -555,7 +555,7 @@ class AVLTree:
         if node.parent is None:
             self.root = None
         else:
-            if node.flight_code < node.parent.flight_code:
+            if node.parent.left is node:
                 node.parent.left = None
             else:
                 node.parent.right = None
@@ -579,7 +579,7 @@ class AVLTree:
             self.root = child_node
             child_node.parent = None
         else:
-            if node.flight_code < node.parent.flight_code:
+            if node.parent.left is node:
                 node.parent.left = child_node
             else:
                 node.parent.right = child_node
