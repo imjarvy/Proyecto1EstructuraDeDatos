@@ -5,6 +5,7 @@
 
 import { registerHandlers } from "./handlers.js";
 import { createTreeUi } from "./treeUi.js";
+import { createQueueUi } from "./queueUi.js";
 
 const state = {
   selectedCode: null,
@@ -71,6 +72,7 @@ function initializeApp() {
     clearForm: treeUi.clearForm,
     getFormPayload: treeUi.getFormPayload,
   });
+  createQueueUi({ api, showToast, updatePanels: treeUi.updatePanels });
 }
 
 initializeApp();

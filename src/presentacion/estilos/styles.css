@@ -943,3 +943,125 @@ section h3 {
   #flightForm      { grid-template-columns: 1fr; }
   #versionsSection { grid-column: 1; }
 }
+
+
+/* =============================================================================
+   QUEUE SECTION — spec §3
+   ============================================================================= */
+#queueSection { grid-column: 1 / -1; }
+
+/* form — mismo grid que #flightForm */
+#queueForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+/* inputs/selects — reutiliza estilos de #flightForm */
+#queueForm input,
+#queueForm select {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  padding: 0.48rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#queueForm input:focus,
+#queueForm select:focus { border-color: var(--accent); background: var(--bg-card); }
+#queueForm input::placeholder { color: var(--text-muted); }
+
+/* buttons — reutiliza mismo patrón que #flightForm button */
+#queueForm button,
+#queueActions button {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 0.48rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+#enqueueBtn  { grid-column: 1 / -1; border-color: var(--green);    color: var(--green);    background: var(--green-light); }
+#processOneBtn                     { border-color: var(--accent);   color: var(--accent);   background: var(--accent-light); }
+#processAllBtn                     { border-color: var(--green);    color: var(--green);    background: var(--green-light); }
+#clearQueueBtn                     { border-color: var(--critical); color: var(--critical); background: var(--critical-light); }
+
+#enqueueBtn:hover    { background: var(--green);    color: #fff; }
+#processOneBtn:hover { background: var(--accent);   color: #fff; }
+#processAllBtn:hover { background: var(--green);    color: #fff; }
+#clearQueueBtn:hover { background: var(--critical); color: #fff; }
+
+/* status + actions — mismo patrón que #metrics */
+#queueStatus {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+#queueStatus p {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.7rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+#queueStatus strong { font-family: var(--font-mono); font-size: 0.6rem; font-weight: 400; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+#queueStatus span   { font-family: var(--font-mono); font-weight: 500; color: var(--text); }
+
+#queueActions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+
+/* lists — mismo patrón que #versionsList */
+#queueList h4,
+#conflictLog h4 {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+#conflictLog h4 { color: var(--critical); }
+
+#pendingList,
+#conflictList { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; max-height: 200px; overflow-y: auto; }
+
+/* items — mismo patrón que .version-item */
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.queue-item strong { color: var(--accent); }
+.queue-price       { margin-left: auto; color: var(--text-muted); font-size: 0.65rem; }
+.empty-queue       { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 1rem; }
+
+.conflict-item {
+  padding: 0.5rem 0.75rem;
+  background: var(--critical-light);
+  border: 1px solid var(--critical-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--critical);
+}

@@ -151,6 +151,55 @@
     </div>
   </section>
 
+  <!-- Queue: concurrent insertion simulation (spec §3) -->
+<section id="queueSection">
+  <h3>Simulación de Concurrencia</h3>
+
+  <!-- Form to schedule a flight without inserting immediately -->
+  <div id="queueForm">
+    <input type="text"   id="qFlightCode"    placeholder="Código de Vuelo" />
+    <input type="text"   id="qOrigin"        placeholder="Origen" />
+    <input type="text"   id="qDestination"   placeholder="Destino" />
+    <input type="number" id="qBasePrice"     placeholder="Precio Base" step="0.01" />
+    <input type="number" id="qPassengers"    placeholder="Pasajeros" value="0" />
+    <input type="number" id="qPromotion"     placeholder="Promoción (0–1)" step="0.01" value="0" />
+    <input type="text"   id="qAlert"         placeholder="Alerta" />
+    <select id="qPriority">
+      <option value="1">1 - Baja</option>
+      <option value="2">2</option>
+      <option value="3" selected>3 - Media</option>
+      <option value="4">4</option>
+      <option value="5">5 - Alta</option>
+    </select>
+    <button id="enqueueBtn">Encolar Vuelo</button>
+  </div>
+
+  <!-- Queue status and controls -->
+  <div id="queueStatus">
+    <p><strong>Pendientes:</strong> <span id="qPending">0</span></p>
+    <p><strong>Procesados:</strong> <span id="qProcessed">0</span></p>
+    <p><strong>Conflictos:</strong> <span id="qConflicts">0</span></p>
+  </div>
+
+  <div id="queueActions">
+    <button id="processOneBtn">▶ Procesar Siguiente</button>
+    <button id="processAllBtn">⏩ Procesar Todo</button>
+    <button id="clearQueueBtn">🗑 Limpiar Cola</button>
+  </div>
+
+  <!-- Pending flights list -->
+  <div id="queueList">
+    <h4>Vuelos en Cola</h4>
+    <ul id="pendingList"><li class="empty-queue">Cola vacía</li></ul>
+  </div>
+
+  <!-- Conflict log -->
+  <div id="conflictLog" class="hidden">
+    <h4>⚠ Conflictos Detectados</h4>
+    <ul id="conflictList"></ul>
+  </div>
+</section>
+
 </main>
 
 <!-- ======= TOAST NOTIFICATION ======= -->

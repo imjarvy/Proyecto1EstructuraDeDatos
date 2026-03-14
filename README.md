@@ -65,3 +65,36 @@ Archivo principal:
 Archivo principal:
 - `src/negocio/AVLTreeManager.py`
 
+
+LOGICA DE COMO USE BLUEPRINT DE FLASK PARA LA SIMULACION DE CONCUERRENCIAS (LOS VUELOS QUE ESTAN ENCOLADOS)
+
+Flujo: 
+# app.py línea 59:
+init_queue(manager)
+
+    ↓
+# Inicializa _queue y _controller en queue_routes.py:
+_queue = FlightQueue()
+_controller = QueueController(manager, _queue)
+
+    ↓
+# Ahora las rutas del blueprint pueden usarlos:
+@queue_bp.route("/api/queue/enqueue", methods=["POST"])
+def enqueue_flight():
+    _queue.enqueue(node)  # ✅ Usa la cola inicializada
+
+# Sección 3 — Concurrent Insertion Simulation (Flight Queue)
+
+Para manejar múltiples solicitudes de inserción sin comprometer la estabilidad del AVL tree, se implementó un sistema de cola FIFO que permite programar vuelos antes de procesarlos en la estructura.
+Cómo está organizado:
+El módulo se divide en tres capas. FlightQueue (src/modelos/FlightQueue.py) es la estructura base — una cola que almacena FlightNode objetos pendientes, lleva el historial de vuelos procesados y registra cualquier balance conflict que ocurra. QueueController (src/controllers/QueueController.py) es el motor de procesamiento, toma los vuelos de la cola uno por uno y los inserta en el AVL tree a través del AVLTreeManager, garantizando que cada inserción quede registrada en el undo stack. También detecta critical balance spikes después de cada inserción y los guarda como conflictos. Finalmente, queue_routes.py (src/routes/queue_routes.py) expone todo como una Flask API mediante un Blueprint.
+Endpoints disponibles:
+
+GET /api/queue — estado actual de la cola
+POST /api/queue/enqueue — programa un vuelo sin insertarlo de inmediato
+POST /api/queue/process-one — inserta el siguiente vuelo pendiente en el árbol
+POST /api/queue/process-all — drena la cola completa de una vez
+DELETE /api/queue/clear — limpia todos los vuelos pendientes
+
+En la interfaz:
+Se agregó una sección dedicada donde el usuario puede llenar el formulario de un vuelo, encolarlo, y luego elegir procesarlos uno a uno o todos de una vez. Los vuelos pendientes se listan en tiempo real, los contadores se actualizan automáticamente, y cualquier conflicto detectado aparece en un log debajo de la cola. 
