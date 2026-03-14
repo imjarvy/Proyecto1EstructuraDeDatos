@@ -152,12 +152,14 @@ export function registerHandlers({
         button.classList.add("active-stress");
         banner.classList.remove("hidden");
         auditButton.style.display = "inline-block";
+        document.body.classList.add("stress-active");    // full-page red theme
         showToast("Modo Estres activado", "warn");
       } else {
         button.textContent = "Activar Modo Estres";
         button.classList.remove("active-stress");
         banner.classList.add("hidden");
         auditButton.style.display = "none";
+        document.body.classList.remove("stress-active"); // restore normal theme
         showToast(`Modo normal restaurado - ${data.rotations_done} rotaciones aplicadas`, "success");
       }
     } catch (_) {}
