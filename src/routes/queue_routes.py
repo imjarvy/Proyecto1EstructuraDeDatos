@@ -12,11 +12,10 @@ _queue: FlightQueue = None
 _controller: QueueController = None
 
 
-def init_queue(avl_tree):
-    # Called from app.py to inject the shared AVL tree instance.
+def init_queue(manager):   # recibe manager, no avl_tree
     global _queue, _controller
     _queue = FlightQueue()
-    _controller = QueueController(avl_tree, _queue)
+    _controller = QueueController(manager, _queue)
 
 
 # ================QUEUE STATUS============================

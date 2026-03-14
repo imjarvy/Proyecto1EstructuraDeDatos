@@ -6,3 +6,5 @@ CONTEXTO_PROYECTO.md
 probar_controller.py
 probar_queue.py
 probar_routes.py
+/versions
+/.venv
