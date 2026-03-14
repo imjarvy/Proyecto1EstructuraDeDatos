@@ -60,8 +60,7 @@ class VersionManager:
                 return file_path
         return None
 
-    def _build_version_payload(self, root: FlightNode, version_name: str) -> Optional[Dict]:
-        """Create the persisted payload containing metadata and serialized tree."""
+    def _build_version_payload(self, root: FlightNode, version_name: str, rotation_count: dict = None, cascade_rebalance_count: int = 0, mass_cancellation_count: int = 0) -> Optional[Dict]:
         serialized = self.persistence.serialize_tree_for_storage(root)
         if not serialized:
             return None
@@ -72,11 +71,13 @@ class VersionManager:
             "tree_size": self.persistence._count_nodes(root),
             "tree_height": root.height,
             "leaf_count": self.persistence._count_leaves(root),
+            "rotation_count": rotation_count or {"LL": 0, "RR": 0, "LR": 0, "RL": 0},
+            "cascade_rebalance_count": cascade_rebalance_count,
+            "mass_cancellation_count": mass_cancellation_count,
         }
-        return {
-            "metadata": metadata,
-            "tree_data": serialized,
-        }
+        return {"metadata": metadata, "tree_data": serialized}
+        
+        
 
     def _extract_tree_data(self, payload: Dict) -> Optional[Dict]:
         """
@@ -103,7 +104,7 @@ class VersionManager:
             print(f"Error writing version file '{file_path}': {e}")
             return False
     
-    def save_version(self, root: Optional[FlightNode], version_name: str) -> bool:
+    def save_version(self, root: Optional[FlightNode], version_name: str, rotation_count: dict = None, cascade_rebalance_count: int = 0, mass_cancellation_count: int = 0) -> bool:
         """
         Save current tree state as a named version.
         
@@ -123,7 +124,7 @@ class VersionManager:
             return False
         
         try:
-            payload = self._build_version_payload(root, version_name)
+            payload = self._build_version_payload(root, version_name, rotation_count=rotation_count, cascade_rebalance_count=cascade_rebalance_count, mass_cancellation_count=mass_cancellation_count)
             if not payload:
                 print("Error: Failed to serialize tree.")
                 return False

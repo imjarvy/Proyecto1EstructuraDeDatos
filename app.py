@@ -504,13 +504,29 @@ def restore_version():
     if not version_name:
         return jsonify({"error": "version_name es requerido"}), 400
 
+    version_file = versions._find_file_by_version_name(version_name)
+    if version_file is None:
+        return jsonify({"error": f"Version '{version_name}' not found"}), 404
+    
+    payload = versions._read_version_file(version_file)
+    root = versions.restore_version(version_name)
+    if root is None:
+        return jsonify({"error": f"Version '{version_name}' not found"}), 404
     root = versions.restore_version(version_name)
     if root is None:
         return jsonify({"error": f"Versión '{version_name}' no encontrada"}), 404
 
     new_avl       = AVLTree()
     new_avl.root  = root
-    manager       = AVLTreeManager(new_avl)
+    
+    meta = payload.get("metadata", {})
+    saved_rotations = meta.get("rotation_count")
+    if isinstance(saved_rotations, dict):
+        new_avl.rotation_count = saved_rotations
+    new_avl.cascade_rebalance_count = int(meta.get("cascade_rebalance_count", 0))
+    new_avl.mass_cancellation_count = int(meta.get("mass_cancellation_count", 0))
+
+    manager = AVLTreeManager(new_avl)
     return jsonify({"tree": _tree_payload()})
 
 
