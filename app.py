@@ -32,6 +32,7 @@ from flask_cors import CORS
 from src.acceso_datos.DataStorage import DataStorage
 from src.acceso_datos.DataPersistence import DataPersistence
 from src.modelos.AVLTree import AVLTree          # ← corregido: estaba en estructuras, es en modelos
+from src.routes.queue_routes import queue_bp, init_queue # Importar el blueprint y la función de inicialización
 
 # ─────────────────────────────────────────────────────────────────────────────
 # static_folder apunta a presentacion/ para servir script.js y estilos/
@@ -40,8 +41,13 @@ from src.modelos.AVLTree import AVLTree          # ← corregido: estaba en estr
 app = Flask(__name__, static_folder="src/presentacion", static_url_path="")
 CORS(app)
 
+# 2. Registrar el blueprint (después de crear app)
+app.register_blueprint(queue_bp)
+
 storage  = DataStorage()
 avl_tree = AVLTree()
+
+init_queue(avl_tree)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
