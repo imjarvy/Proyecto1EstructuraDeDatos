@@ -170,9 +170,11 @@ def _reconstruct_from_topology(data: dict) -> bool:
             current.right = node_map[rc]
             node_map[rc].parent = current
 
-    new_avl       = AVLTree()
+    current_stress_mode = manager.tree.stress_mode
+    new_avl       = AVLTree(stress_mode=current_stress_mode)
     new_avl.root  = root_node
-    manager       = AVLTreeManager(new_avl)
+    manager.tree  = new_avl
+    manager._undo_stack.clear()
     return True
 
 
@@ -183,14 +185,16 @@ def _reconstruct_from_insertion(data: dict) -> bool:
     if not flights:
         return False
 
-    new_avl  = AVLTree()
+    current_stress_mode = manager.tree.stress_mode
+    new_avl  = AVLTree(stress_mode=current_stress_mode)
     bst_tree = BST()
 
     for fd in flights:
         new_avl.insert(FlightNode.from_dict(fd))
         bst_tree.insert(FlightNode.from_dict(fd))
 
-    manager = AVLTreeManager(new_avl)
+    manager.tree = new_avl
+    manager._undo_stack.clear()
     return True
 
 
@@ -528,7 +532,8 @@ def restore_version():
     if root is None:
         return jsonify({"error": f"Versión '{version_name}' no encontrada"}), 404
 
-    new_avl       = AVLTree()
+    current_stress_mode = manager.tree.stress_mode
+    new_avl       = AVLTree(stress_mode=current_stress_mode)
     new_avl.root  = root
     
     meta = payload.get("metadata", {})
@@ -538,7 +543,8 @@ def restore_version():
     new_avl.cascade_rebalance_count = int(meta.get("cascade_rebalance_count", 0))
     new_avl.mass_cancellation_count = int(meta.get("mass_cancellation_count", 0))
 
-    manager = AVLTreeManager(new_avl)
+    manager.tree = new_avl
+    manager._undo_stack.clear()
     return jsonify({"tree": _tree_payload()})
 
 
