@@ -1,100 +1,215 @@
-# Proyecto1EstructuraDeDatos
+# 🛫 SkyBalance AVL — Sistema de Gestión Aérea
 
-## Estado actual (lo que ya esta implementado)
+> **Sistema inteligente de gestión de vuelos** basado en un árbol AVL autobalanceado, con análisis de rentabilidad, modo estrés y versionado persistente.
 
-Esta etapa del proyecto ya tiene implementadas y probadas las funcionalidades base del modulo AVL.
+## Descripción del proyecto
 
-### 1 Carga inicial desde JSON (sin ruta fija)
+**SkyBalance AVL** es una aplicación completa de gestión de vuelos que demuestra la implementación práctica de estructuras de datos avanzadas. El sistema utiliza un árbol AVL autobalanceado para mantener información de vuelos de forma eficiente, permitiendo operaciones CRUD, búsqueda, análisis económico y auditoría, todo con una interfaz gráfica moderna que se actualiza en tiempo real.
 
-- La carga se hace desde selector de archivo (explorador de archivos).
-- Se soportan los 2 modos requeridos:
-	- Topologia: reconstruye respetando padres e hijos del JSON.
-	- Insercion: inserta vuelo por vuelo en AVL y en BST para comparacion.
+### Caso de uso
+Una aerolínea necesita gestionar su catálogo de vuelos manteniendo un balance óptimo entre profundidad de búsqueda (minimizar latencia) y profundidad crítica (aplicar recargos de tarifa). **SkyBalance AVL** lo hace automáticamente.
 
-Archivos principales:
-- `src/acceso_datos/DataLoader.py`
-- `src/acceso_datos/DataStorage.py`
+---
 
-### 2 AVL + BST en modo insercion
+## 🚀 Inicio rápido
 
-- En modo insercion se construyen ambos arboles con el mismo orden de insercion.
-- El BST se mantiene como referencia visual/comparativa.
-- El AVL mantiene balance automatico.
+```bash
+# 1. Instalar dependencias
+pip install -r requirements.txt
 
-Archivos principales:
-- `src/modelos/AVLTree.py`
-- `src/modelos/BST.py`
-- `src/acceso_datos/DataStorage.py`
+# 2. Ejecutar la aplicación
+python app.py
 
-### 3 CRUD y logica de negocio del AVL
+# 3. Abrir en el navegador
+# http://localhost:5000
+```
 
-- Insercion de vuelos.
-- Modificacion de vuelos.
-- Eliminacion individual de nodos.
-- Cancelacion en cascada (vuelo + toda su descendencia), diferente de eliminacion individual.
+---
 
-Archivo principal:
-- `src/negocio/AVLTreeManager.py`
+## Estructura del proyecto
 
-### 4 Modo estres + rebalanceo global
+```
+Proyecto1EstructuraDeDatos/
+│
+├── app.py                          ← Servidor Flask + endpoints REST
+├── requirements.txt                ← Dependencias (Flask, Flask-CORS)
+├── README.md                       ← Este archivo
+│
+├── src/                            ← Código fuente principal
+│   ├── acceso_datos/               ← Capa de persistencia
+│   │   ├── DataLoader.py           ├─ Carga y validación de JSON
+│   │   ├── DataPersistence.py      ├─ Serialización del árbol
+│   │   ├── DataStorage.py          ├─ Orquestador central
+│   │   └── VersionManager.py       └─ Sistema de versionado
+│   │
+│   ├── controllers/                ← Lógica de control
+│   │   └── QueueController.py      ← Procesador de cola FIFO
+│   │
+│   ├── modelos/                    ← Estructuras de datos
+│   │   ├── AVLTree.py              ├─ Árbol AVL (CORE)
+│   │   ├── BST.py                  ├─ Árbol binario (comparativa)
+│   │   ├── FlightNode.py           ├─ Nodo con datos de vuelo
+│   │   └── FlightQueue.py          └─ Cola de concurrencia
+│   │
+│   ├── negocio/                    ← Lógica de negocios
+│   │   ├── AVLTreeManager.py       ├─ Operaciones CRUD
+│   │   └── TreeAnalysisManager.py  └─ Análisis y auditoría
+│   │
+│   ├── routes/                     ← Endpoints REST
+│   │   └── queue_routes.py         ← Blueprint de cola
+│   │
+│   └── presentacion/               ← Frontend
+│       ├── estilos/
+│       │   └── styles.css          ← Tema + modo estrés
+│       └── vistas/
+│           └── index.html          ← Aplicación SPA
+│
+└── versions/                       ← Versiones guardadas (JSON snapshots)
+    ├── demo_tutorial_*.json
+    ├── prueba_*.json
+    └── ...
+```
 
-- Modo normal: balanceo en cada insercion.
-- Modo estres: difiere balanceo durante inserciones.
-- `global_rebalance()` aplica rebalanceo masivo al final.
+### Componentes principales
 
-Archivo principal:
-- `src/modelos/AVLTree.py`
+| Componente | Responsabilidad |
+|---|---|
+| **AVLTree.py** | Árbol autobalanceado con rotaciones (LL, RR, LR, RL) y modo estrés |
+| **DataStorage.py** | Orquestador central: carga, guardado, versionado |
+| **AVLTreeManager.py** | Operaciones CRUD con validación exhaustiva |
+| **TreeAnalysisManager.py** | Auditoría, penalización por profundidad, rentabilidad |
+| **Flask (app.py)** | API REST con endpoints para todas las operaciones |
+| **Frontend (index.html)** | Visualización D3.js con sincronización en tiempo real |
 
-### 5 Versionado persistente
+---
 
-- Versiones guardadas en disco (JSON por version).
-- Cada version guarda metadatos (incluye `version_name`) y snapshot del arbol.
-- Funciones disponibles: guardar, listar, info, restaurar, eliminar, exportar e importar version.
+## 📋 Requisitos previos
 
-Archivo principal:
-- `src/acceso_datos/VersionManager.py`
+- **Python 3.7+**
+- **pip** (gestor de paquetes)
+- **Navegador moderno** (Chrome, Firefox, Edge, Safari)
 
-### 6 Pila de retroceso (Ctrl+Z)
+---
 
-- Se guarda snapshot antes de acciones mutantes.
-- Se puede deshacer: insercion, eliminacion, modificacion y cancelacion.
-- API de negocio:
-	- `can_undo()`
-	- `undo_last_action()`
+## 🎯 Funcionalidades principales
 
-Archivo principal:
-- `src/negocio/AVLTreeManager.py`
+### 1. **Árbol AVL Autobalanceado** 🌳
+- Mantiene balance automático mediante rotaciones (LL, RR, LR, RL)
+- Factor de balance siempre en {−1, 0, 1}
+- Complejidad garantizada O(log n) para búsqueda, inserción y eliminación
 
+### 2. **Gestión completa de datos (CRUD)** ✏️
+- **Agregar** — validación de campos, cálculo de precio final con promoción
+- **Editar** — modificación en sitio con rebalanceo automático si cambia código
+- **Eliminar** — eliminación individual con reubicación automática de hijos
+- **Cancelar** — eliminación atómica de nodo + subárbol completo
 
-LOGICA DE COMO USE BLUEPRINT DE FLASK PARA LA SIMULACION DE CONCUERRENCIAS (LOS VUELOS QUE ESTAN ENCOLADOS)
+### 3. **Modo Estrés + Rebalanceo Global** ⚡
+- **Modo normal**: rebalanceo automático tras cada inserción/eliminación
+- **Modo estrés**: rotaciones diferidas (árbol acumula desbalance intencionalmente)
+  - Interfaz cambia a tema visual rojo
+  - `global_rebalance()`: ejecuta todas las rotaciones pendientes en un paso
+  - Reporta número total de rotaciones ejecutadas
 
-Flujo: 
-# app.py línea 59:
-init_queue(manager)
+### 4. **Penalización por profundidad crítica** 📊
+- Nodos más profundos que el límite aplican **recargo del 25%** sobre precio base
+- Fórmula: `final_price = base_price × 1.25`
+- Profundidad crítica es configurable desde la interfaz
+- Recalculación automática sin necesidad de rebalanceo
 
-    ↓
-# Inicializa _queue y _controller en queue_routes.py:
-_queue = FlightQueue()
-_controller = QueueController(manager, _queue)
+### 5. **Versionado con snapshots** 💾
+- Guarda estado completo del árbol en archivos JSON independientes
+- Metadatos: nombre, timestamp, altura, contadores de rotación
+- Operaciones: guardar, listar, restaurar, eliminar
+- Restauración exacta (incluyendo contadores de rotación)
 
-    ↓
-# Ahora las rutas del blueprint pueden usarlos:
-@queue_bp.route("/api/queue/enqueue", methods=["POST"])
-def enqueue_flight():
-    _queue.enqueue(node)  # ✅ Usa la cola inicializada
+### 6. **Pila Deshacer (Ctrl+Z)** ↩️
+- Captura snapshot antes de cada operación mutante
+- Historial ilimitado durante la sesión
+- Navega entre estados sin limitación de profundidad
 
-# Sección 3 — Concurrent Insertion Simulation (Flight Queue)
+### 7. **Auditoría AVL** 🔍
+- Verifica invariantes:
+  1. Balance factor ∈ {−1, 0, 1} para todos los nodos
+  2. Altura almacenada coincide con la calculada
+- Reporta nodo, profundidad, valores encontrados vs. esperados
+- Activable en modo estrés
 
-Para manejar múltiples solicitudes de inserción sin comprometer la estabilidad del AVL tree, se implementó un sistema de cola FIFO que permite programar vuelos antes de procesarlos en la estructura.
-Cómo está organizado:
-El módulo se divide en tres capas. FlightQueue (src/modelos/FlightQueue.py) es la estructura base — una cola que almacena FlightNode objetos pendientes, lleva el historial de vuelos procesados y registra cualquier balance conflict que ocurra. QueueController (src/controllers/QueueController.py) es el motor de procesamiento, toma los vuelos de la cola uno por uno y los inserta en el AVL tree a través del AVLTreeManager, garantizando que cada inserción quede registrada en el undo stack. También detecta critical balance spikes después de cada inserción y los guarda como conflictos. Finalmente, queue_routes.py (src/routes/queue_routes.py) expone todo como una Flask API mediante un Blueprint.
-Endpoints disponibles:
+### 8. **Análisis de rentabilidad** 💹
+- Calcula rentabilidad: `pasajeros × precio_final`
+- Identifica vuelo menos rentable con tie-breaking
+  - Prioridad 1: mayor profundidad
+  - Prioridad 2: código lexicográfico mayor
+- Eliminación automática con subárbol completo
 
-GET /api/queue — estado actual de la cola
-POST /api/queue/enqueue — programa un vuelo sin insertarlo de inmediato
-POST /api/queue/process-one — inserta el siguiente vuelo pendiente en el árbol
-POST /api/queue/process-all — drena la cola completa de una vez
-DELETE /api/queue/clear — limpia todos los vuelos pendientes
+### 9. **Cola FIFO de concurrencia** 📋
+- Encola vuelos antes de insertarlos en el árbol
+- Procesamiento: uno a uno o en lote
+- Detecta *critical balance spikes* (balance_factor ≥ 2)
+- Registro automático de conflictos detectados
 
-En la interfaz:
-Se agregó una sección dedicada donde el usuario puede llenar el formulario de un vuelo, encolarlo, y luego elegir procesarlos uno a uno o todos de una vez. Los vuelos pendientes se listan en tiempo real, los contadores se actualizan automáticamente, y cualquier conflicto detectado aparece en un log debajo de la cola. 
+### 10. **Árbol BST comparativo** 📈
+- Se construye en modo inserción en paralelo con AVL
+- Referencia visual: muestra diferencia de profundidad sin balanceo
+- Justifica la necesidad de AVL para aplicaciones reales
+
+---
+
+## 📡 API REST — Referencia completa
+
+### 🌳 Operaciones de árbol
+
+| Método | Ruta | Descripción |
+|:---:|---|---|
+| `GET` | `/api/tree-state` | Estado completo (topología, nodos, metadatos) |
+| `POST` | `/api/load-tree` | Carga y reconstruye árbol desde JSON |
+| `GET` | `/api/export-tree` | Exporta árbol a `~/Downloads` |
+
+### ✈️ CRUD de vuelos
+
+| Método | Ruta | Descripción |
+|:---:|---|---|
+| `POST` | `/api/add-flight` | Inserta vuelo con validación |
+| `POST` | `/api/edit-flight` | Actualiza datos de vuelo existente |
+| `POST` | `/api/delete-flight` | Elimina nodo individual |
+| `POST` | `/api/cancel-flight` | Cancela vuelo y su subárbol completo |
+
+### 🎮 Control y análisis
+
+| Método | Ruta | Descripción |
+|:---:|---|---|
+| `POST` | `/api/undo` | Deshace última acción |
+| `POST` | `/api/toggle-stress-mode` | Activa/desactiva modo estrés |
+| `POST` | `/api/global-rebalance` | Ejecuta rebalanceo masivo |
+| `GET` | `/api/audit-avl` | Auditoría de propiedades AVL |
+| `POST` | `/api/delete-least-profitable` | Cancela vuelo menos rentable |
+| `POST` | `/api/update-critical-depth` | Configura profundidad crítica |
+
+### 📦 Versiones y cola
+
+| Método | Ruta | Descripción |
+|:---:|---|---|
+| `POST` | `/api/save-version` | Guarda versión con nombre |
+| `GET` | `/api/list-versions` | Lista todas las versiones |
+| `POST` | `/api/restore-version` | Restaura versión guardada |
+| `POST` | `/api/delete-version` | Elimina versión |
+| `GET` | `/api/queue` | Estado actual de cola |
+| `POST` | `/api/queue/enqueue` | Encola vuelo sin insertarlo |
+| `POST` | `/api/queue/process-one` | Inserta siguiente vuelo |
+| `POST` | `/api/queue/process-all` | Drena cola completa |
+| `DELETE` | `/api/queue/clear` | Limpia todos los vuelos pendientes |
+
+---
+
+## ✨ Características destacadas
+
+✅ **Visualización en tiempo real** con D3.js  
+✅ **Tema dinámico** (modo normal + modo estrés visual)  
+✅ **Validación exhaustiva** en tres niveles (entrada → lógica → negocio)  
+✅ **Análisis económico integrado** (profundidad, rentabilidad, penalización)  
+✅ **Versionado completo** con snapshots instantáneos  
+✅ **Deshacer ilimitado** (Ctrl+Z) sin límite de profundidad  
+✅ **Auditoría integrada** para verificar invariantes AVL  
+✅ **Modo estrés** para demostraciones y análisis de comportamiento  
+
+---
