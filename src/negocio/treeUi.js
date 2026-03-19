@@ -3,9 +3,32 @@
 //  Responsibility: tree rendering, panel updates, node selection, and form sync.
 // =============================================================================
 
+/**
+ * Create tree UI utilities for rendering and panel synchronization.
+ *
+ * @param {Object} deps - Tree UI dependencies.
+ * @param {Object} deps.state - Shared frontend state.
+ * @param {Function} deps.showToast - Toast notifier for validation feedback.
+ * @returns {{
+ *   renderTree: Function,
+ *   updatePanels: Function,
+ *   updateBstPanel: Function,
+ *   selectNode: Function,
+ *   clearForm: Function,
+ *   getFormPayload: Function
+ * }} Public tree UI API.
+ */
 export function createTreeUi({ state, showToast }) {
   const d3Api = window.d3;
 
+  /**
+   * Render a tree payload into an SVG container using D3 hierarchy layout.
+   *
+   * @param {Object|null} root - Root node payload from backend.
+   * @param {string} svgId - Target SVG element id.
+   * @param {string} containerId - Parent container id used for sizing.
+   * @returns {void}
+   */
   function renderTree(root, svgId, containerId) {
     const svg = d3Api.select(`#${svgId}`);
     svg.selectAll("*").remove();
@@ -86,6 +109,12 @@ export function createTreeUi({ state, showToast }) {
       );
   }
 
+  /**
+   * Update all AVL metric panels and re-render the main AVL tree.
+   *
+   * @param {Object} treeData - Standard tree payload returned by backend.
+   * @returns {void}
+   */
   function updatePanels(treeData) {
     const metrics = treeData.metrics || {};
 
@@ -112,6 +141,12 @@ export function createTreeUi({ state, showToast }) {
     renderTree(treeData.root, "treeSvg", "treeContainer");
   }
 
+  /**
+   * Update BST comparison panel values and render BST tree.
+   *
+   * @param {Object} bstData - BST payload returned by backend in insertion mode.
+   * @returns {void}
+   */
   function updateBstPanel(bstData) {
     document.getElementById("bstSection").classList.remove("hidden");
     document.getElementById("bstRoot").textContent = bstData.root?.flight_code ?? "-";
@@ -121,6 +156,12 @@ export function createTreeUi({ state, showToast }) {
     renderTree(bstData.root, "bstSvg", "bstContainer");
   }
 
+  /**
+   * Handle node selection from the tree and synchronize form/detail panels.
+   *
+   * @param {Object} nodeData - Selected flight node payload.
+   * @returns {void}
+   */
   function selectNode(nodeData) {
     state.selectedCode = nodeData.flight_code;
 
@@ -154,6 +195,11 @@ export function createTreeUi({ state, showToast }) {
     `;
   }
 
+  /**
+   * Clear form fields and reset button/detail state after operations.
+   *
+   * @returns {void}
+   */
   function clearForm() {
     state.selectedCode = null;
     ["flightCode", "origin", "destination", "basePrice", "passengers", "promotion", "alert"]
@@ -167,6 +213,11 @@ export function createTreeUi({ state, showToast }) {
     document.getElementById("nodeDetail").classList.add("hidden");
   }
 
+  /**
+   * Build and validate payload for add/edit flight requests.
+   *
+   * @returns {Object|null} Form payload, or null when required fields are invalid.
+   */
   function getFormPayload() {
     const flightCode = document.getElementById("flightCode").value.trim();
     const origin = document.getElementById("origin").value.trim();

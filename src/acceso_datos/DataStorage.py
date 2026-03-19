@@ -29,7 +29,13 @@ class DataStorage:
         self.version_manager = VersionManager()
 
     def _clone_flight_node(self, node: FlightNode) -> FlightNode:
-        """Create an independent copy of a flight node."""
+        """
+        Create an independent copy of a flight node.
+        
+        Cloning is necessary when reconstructing trees from external data
+        to prevent mutations from affecting the original parsed data or
+        making shared references between AVL and BST trees.
+        """
         return FlightNode.from_dict(node.to_dict())
 
     # ============================================================================

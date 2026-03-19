@@ -3,6 +3,21 @@
 //  Responsibility: register UI event listeners and orchestrate frontend flows.
 // =============================================================================
 
+/**
+ * Register all UI event listeners for CRUD, stress mode, audit, and versioning.
+ *
+ * @param {Object} deps - Dependencies injected from the app coordinator.
+ * @param {Object} deps.state - Shared frontend state.
+ * @param {Function} deps.api - HTTP helper for backend requests.
+ * @param {Function} deps.showToast - Toast notifier utility.
+ * @param {Function} deps.openModal - Opens a modal by id.
+ * @param {Function} deps.closeModal - Closes a modal by id.
+ * @param {Function} deps.updatePanels - Refreshes AVL panels and tree rendering.
+ * @param {Function} deps.updateBstPanel - Refreshes BST comparison panel.
+ * @param {Function} deps.clearForm - Clears CRUD form and selection.
+ * @param {Function} deps.getFormPayload - Builds validated form payload.
+ * @returns {void}
+ */
 export function registerHandlers({
   state,
   api,
@@ -231,6 +246,11 @@ export function registerHandlers({
     openModal("versionsModal");
   });
 
+  /**
+   * Fetch saved versions and render the modal list with restore/delete actions.
+   *
+   * @returns {Promise<void>}
+   */
   async function refreshVersionsList() {
     try {
       const data = await api("/api/list-versions");

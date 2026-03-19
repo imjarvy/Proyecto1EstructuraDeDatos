@@ -1,8 +1,22 @@
 // Queue UI module — handles all /api/queue interactions
 
+/**
+ * Initialize queue UI interactions and synchronize queue widgets with backend state.
+ *
+ * @param {Object} deps - Queue UI dependencies.
+ * @param {Function} deps.api - HTTP helper for backend requests.
+ * @param {Function} deps.showToast - Toast notifier utility.
+ * @param {Function} deps.updatePanels - Refreshes AVL panels after queue processing.
+ * @returns {void}
+ */
 export function createQueueUi({ api, showToast, updatePanels }) {
 
   // ── helpers ──────────────────────────────────────────────
+  /**
+   * Build and validate payload for queue insertion form.
+   *
+   * @returns {Object|null} Flight payload, or null when required fields are invalid.
+   */
   function getQueueFormPayload() {
     const code  = document.getElementById("qFlightCode").value.trim().toUpperCase();
     const org   = document.getElementById("qOrigin").value.trim();
@@ -26,6 +40,11 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     };
   }
 
+  /**
+   * Reset queue form controls to default values.
+   *
+   * @returns {void}
+   */
   function clearQueueForm() {
     ["qFlightCode","qOrigin","qDestination","qBasePrice",
      "qPassengers","qPromotion","qAlert"].forEach(id => {
@@ -34,6 +53,12 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     document.getElementById("qPriority").value = "3";
   }
 
+  /**
+   * Render queue counters, pending list, and conflicts panel.
+   *
+   * @param {Object} data - Queue state returned by /api/queue.
+   * @returns {void}
+   */
   function renderQueueState(data) {
     // update counters
     document.getElementById("qPending").textContent   = data.total_pending;
@@ -67,6 +92,11 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     }
   }
 
+  /**
+   * Fetch current queue state and repaint queue widgets.
+   *
+   * @returns {Promise<void>}
+   */
   async function refreshQueue() {
     try {
       const data = await api("/api/queue");
@@ -123,6 +153,11 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     } catch (_) {}
   });
 
+  /**
+   * Fetch full AVL tree payload for panel refresh after queue operations.
+   *
+   * @returns {Promise<Object>} Tree payload consumed by updatePanels.
+   */
   async function getTreeState() {
     const data = await api("/api/tree-state");
     return data.tree;

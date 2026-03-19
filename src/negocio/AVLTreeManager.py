@@ -15,7 +15,7 @@ from src.modelos.FlightNode import FlightNode
 from src.acceso_datos.DataStorage import DataStorage
 
 
-# Fields that can be updated without changing the BST key (flight_code).
+# Fields that can be updated without changing the AVL key (flight_code).
 _UPDATABLE_FIELDS = {
     "origin",
     "destination",
@@ -47,9 +47,7 @@ class AVLTreeManager:
         self._storage = DataStorage()
         self._undo_stack: List[Dict[str, Any]] = []
         
-
-    # PILA DE DESHACER (Crtl+Z)
-    
+    #   UNDO STACK (Crtl+Z)
     def _snapshot_state(self) -> Dict[str, Any]:
         """Capture full reversible AVL state for Ctrl+Z operations."""
         return {
@@ -168,12 +166,11 @@ class AVLTreeManager:
         self._validate_priority(priority)
 
         # Ensure code is not already present
-        if self.tree.root is not None:
-            existing = self.tree.search(flight_code)
-            if existing is not None:
-                raise KeyError(
-                    f"Flight code '{flight_code}' already exists in the tree."
-                )
+        existing = self.get_flight(flight_code)
+        if existing is not None:
+            raise KeyError(
+                f"Flight code '{flight_code}' already exists in the tree."
+            )
 
         node = FlightNode(
             flight_code=flight_code.strip().upper(),
@@ -212,7 +209,7 @@ class AVLTreeManager:
         self._validate_flight_code(flight_code)
         code = flight_code.strip().upper()
 
-        if self.tree.root is None or self.tree.search(code) is None:
+        if self.get_flight(code) is None:
             raise KeyError(f"Flight '{code}' not found in the tree.")
 
         self._push_undo_state()
