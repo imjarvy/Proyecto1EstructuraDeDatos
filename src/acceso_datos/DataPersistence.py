@@ -1,5 +1,5 @@
 """
-DataPersistence module for the SkyBalance AVL Flight Management System.
+DataPersistence module.
 
 This module handles exporting tree structures to JSON, maintaining the
 hierarchical structure with all node properties.
@@ -64,39 +64,6 @@ class DataPersistence:
             print(f"Unexpected error during export: {e}")
             return False
     
-    def export_tree_topology_only(self, root: Optional[FlightNode], file_path: str) -> bool:
-        """
-        Export tree structure with minimal data (for topology reconstruction).
-        
-        Args:
-            root (FlightNode): Root node of the tree.
-            file_path (str): Path where JSON will be saved.
-            
-        Returns:
-            bool: True if export successful, False otherwise.
-        """
-        if not root:
-            print("Error: Root node is None.")
-            return False
-        
-        try:
-            export_data = {
-                "root_code": root.flight_code,
-                "tree_structure": {}
-            }
-            
-            self._traverse_topology_only(root, export_data["tree_structure"])
-            
-            with open(file_path, 'w', encoding='utf-8') as file:
-                json.dump(export_data, file, indent=2, ensure_ascii=False)
-            
-            print(f"Successfully exported topology to: {file_path}")
-            return True
-        
-        except (IOError, Exception) as e:
-            print(f"Error exporting topology: {e}")
-            return False
-    
     def _traverse_and_collect(self, node: FlightNode, tree_dict: Dict[str, Any]):
         """
         Recursively traverse tree and collect node data with relationships.
@@ -123,33 +90,6 @@ class DataPersistence:
         
         if node.right:
             self._traverse_and_collect(node.right, tree_dict)
-    
-    def _traverse_topology_only(self, node: FlightNode, tree_dict: Dict[str, Any]):
-        """
-        Traverse tree collecting only structure and flight codes.
-        
-        Args:
-            node (FlightNode): Current node being processed.
-            tree_dict (Dict): Dictionary to store topology data.
-        """
-        if not node:
-            return
-        
-        node_entry = {
-            "flight_code": node.flight_code,
-            "height": node.height,
-            "balance_factor": node.balance_factor,
-            "left_child": node.left.flight_code if node.left else None,
-            "right_child": node.right.flight_code if node.right else None
-        }
-        
-        tree_dict[node.flight_code] = node_entry
-        
-        if node.left:
-            self._traverse_topology_only(node.left, tree_dict)
-        
-        if node.right:
-            self._traverse_topology_only(node.right, tree_dict)
     
     def serialize_tree_for_storage(self, root: Optional[FlightNode]) -> Optional[Dict]:
         """
@@ -220,63 +160,17 @@ class DataPersistence:
                 current_node.right.parent = current_node
         
         return root
-    
-    def get_tree_metadata(self, root: Optional[FlightNode]) -> Dict[str, Any]:
-        """
-        Calculate and return tree metadata.
-        
-        Args:
-            root (FlightNode): Root node of the tree.
-            
-        Returns:
-            dict: Dictionary containing tree statistics.
-        """
-        if not root:
-            return {
-                "root": None,
-                "height": 0,
-                "node_count": 0,
-                "leaf_count": 0
-            }
-        
-        metadata = {
-            "root": root.flight_code,
-            "height": root.height,
-            "node_count": self._count_nodes(root),
-            "leaf_count": self._count_leaves(root)
-        }
-        
-        return metadata
-    
-    def _count_nodes(self, node: Optional[FlightNode]) -> int:
-        """
-        Count total number of nodes in tree.
-        
-        Args:
-            node (FlightNode): Current node.
-            
-        Returns:
-            int: Total node count.
-        """
-        if not node:
+
+    def count_nodes(self, node: Optional[FlightNode]) -> int:
+        """Count total number of nodes in a tree rooted at node."""
+        if node is None:
             return 0
-        
-        return 1 + self._count_nodes(node.left) + self._count_nodes(node.right)
-    
-    def _count_leaves(self, node: Optional[FlightNode]) -> int:
-        """
-        Count leaf nodes in tree.
-        
-        Args:
-            node (FlightNode): Current node.
-            
-        Returns:
-            int: Total leaf count.
-        """
-        if not node:
+        return 1 + self.count_nodes(node.left) + self.count_nodes(node.right)
+
+    def count_leaves(self, node: Optional[FlightNode]) -> int:
+        """Count total number of leaf nodes in a tree rooted at node."""
+        if node is None:
             return 0
-        
-        if not node.left and not node.right:
+        if node.left is None and node.right is None:
             return 1
-        
-        return self._count_leaves(node.left) + self._count_leaves(node.right)
+        return self.count_leaves(node.left) + self.count_leaves(node.right)

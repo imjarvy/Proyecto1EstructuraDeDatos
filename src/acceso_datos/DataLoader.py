@@ -1,124 +1,47 @@
 """
-DataLoader module for the SkyBalance AVL Flight Management System.
+DataLoader module.
 
-This module handles loading flight data from JSON files and reconstructing
-tree structures in both topology and insertion modes.
+This module handles loading and parsing JSON data from file streams.
+Coordinates with DataPersistence for object conversion.
 """
 
 import json
-from typing import Optional, List, Literal
-from tkinter import filedialog
+from typing import Optional, Literal, Tuple
 from src.modelos.FlightNode import FlightNode
-
 
 class DataLoader:
     """
-    Handles loading and parsing flight data from JSON files.
+    Handles loading and parsing JSON data from file streams.
     
-    Supports two reconstruction modes:
-    - Topology: Preserves exact parent-child relationships from JSON.
-    - Insertion: Builds trees by sequentially inserting flights.
+    Responsibilities:
+    - Read JSON from streams (Flask uploads)
+    - Validate JSON structure matches expected topology/insertion format
+    - Expose raw parsed data to orchestrators
     """
     
     def __init__(self):
         """Initialize the DataLoader."""
         self.raw_data = None
-        self.flights_list = []
-        self.node_map = {}
     
-    def select_and_load_file(self) -> bool:
+    def load_from_stream(self, stream) -> Tuple[bool, Optional[str]]:
         """
-        Open file dialog for user to select a JSON file.
-        
-        Returns:
-            bool: True if file loaded successfully, False otherwise.
-        """
-        try:
-            file_path = filedialog.askopenfilename(
-                title="Select flight data JSON file",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-            )
-            
-            if not file_path:
-                print("No file selected.")
-                return False
-            
-            with open(file_path, 'r', encoding='utf-8') as file:
-                self.raw_data = json.load(file)
-            
-            print(f"Successfully loaded: {file_path}")
-            self._parse_flights()
-            return True
-        
-        except FileNotFoundError:
-            print(f"Error: File not found.")
-            return False
-        except json.JSONDecodeError:
-            print("Error: Invalid JSON format.")
-            return False
-        except Exception as e:
-            print(f"Unexpected error loading file: {e}")
-            return False
-    
-    def load_from_path(self, file_path: str) -> bool:
-        """
-        Load JSON file from a given path (for testing purposes).
-        
+        Load and parse JSON content from an open file-like stream.
+
         Args:
-            file_path (str): Path to the JSON file.
-            
+            stream: Readable stream that provides JSON content.
+
         Returns:
-            bool: True if file loaded successfully, False otherwise.
+            Tuple[bool, Optional[str]]: (success, error_message).
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                self.raw_data = json.load(file)
-            
-            self._parse_flights()
-            return True
-        except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-            print(f"Error loading file: {e}")
-            return False
-    
-    def _parse_flights(self):
-        """
-        Extract flight data from raw JSON.
-        
-        Expected JSON structure:
-        {
-            "flights": [
-                {
-                    "flight_code": "SK001",
-                    "origin": "Bogotá",
-                    "destination": "Medellín",
-                    "base_price": 250000.0,
-                    ...
-                }
-            ]
-        }
-        """
-        self.flights_list = []
-        self.node_map = {}
-
-        if not self.raw_data:
-            print("Warning: Loaded JSON is empty.")
-            return
-
-        if not isinstance(self.raw_data, dict):
-            print("Warning: JSON root must be an object.")
-            return
-
-        flights_source = self.raw_data.get("flights")
-        if not isinstance(flights_source, list):
-            # In topology mode there may be no flights list, this is expected.
-            return
-
-        for flight_data in flights_source:
-            flight_code = flight_data.get("flight_code")
-            if flight_code:
-                node = FlightNode.from_dict(flight_data)
-                self.flights_list.append(node)
-                self.node_map[flight_code] = node
+            if hasattr(stream, "seek"):
+                stream.seek(0)
+            self.raw_data = json.load(stream)
+            return True, None
+        except json.JSONDecodeError as e:
+            return False, f"JSON inválido: {e}"
+        except Exception as e:
+            return False, f"Error leyendo archivo: {e}"
 
     def get_reconstruction_mode(self) -> Literal["topology", "insertion", "unknown"]:
         """
@@ -138,111 +61,6 @@ class DataLoader:
 
         return "unknown"
     
-    def reconstruct_topology_mode(self) -> Optional[FlightNode]:
-        """
-        Reconstruct tree respecting parent-child topology from JSON.
-        
-        Expected JSON structure for topology mode:
-        {
-            "root_code": "SK001",
-            "tree_structure": {
-                "SK001": {
-                    "flight_data": {...},
-                    "left_child": "SK002",
-                    "right_child": "SK003"
-                }
-            }
-        }
-        
-        Returns:
-            FlightNode: Root node of reconstructed tree, or None if failed.
-        """
-        if not self.raw_data:
-            print("Error: No data loaded.")
-            return None
-
-        if self.get_reconstruction_mode() != "topology":
-            print("Error: Loaded JSON is not in topology mode.")
-            return None
-
-        if "tree_structure" not in self.raw_data or "root_code" not in self.raw_data:
-            print("Error: Missing 'tree_structure' or 'root_code' in JSON.")
-            return None
-        
-        tree_structure = self.raw_data["tree_structure"]
-        root_code = self.raw_data["root_code"]
-        
-        # Build nodes first
-        self._build_nodes_from_topology(tree_structure)
-        
-        # Establish parent-child relationships
-        root = self._establish_relationships(tree_structure, root_code)
-        
-        return root
-    
-    def _build_nodes_from_topology(self, tree_structure: dict):
-        """
-        Create FlightNode instances from topology structure.
-        
-        Args:
-            tree_structure (dict): Dictionary mapping flight codes to node data.
-        """
-        self.node_map = {}
-        
-        for flight_code, node_data in tree_structure.items():
-            if "flight_data" not in node_data:
-                raise ValueError(
-                    f"Invalid topology JSON: node '{flight_code}' is missing 'flight_data'."
-                )
-
-            flight_info = node_data["flight_data"]
-            node = FlightNode.from_dict(flight_info)
-            self.node_map[flight_code] = node
-    
-    def _establish_relationships(self, tree_structure: dict, root_code: str) -> Optional[FlightNode]:
-        """
-        Establish parent-child pointers based on topology.
-        
-        Args:
-            tree_structure (dict): Dictionary mapping flight codes to node data.
-            root_code (str): Code of the root node.
-            
-        Returns:
-            FlightNode: Root node with established relationships.
-        """
-        root = self.node_map.get(root_code)
-        if not root:
-            print(f"Error: Root node '{root_code}' not found.")
-            return None
-        
-        for flight_code, node_data in tree_structure.items():
-            current_node = self.node_map[flight_code]
-            
-            # Establish left child relationship
-            left_child_code = node_data.get("left_child")
-            if left_child_code and left_child_code in self.node_map:
-                left_child = self.node_map[left_child_code]
-                current_node.left = left_child
-                left_child.parent = current_node
-            
-            # Establish right child relationship
-            right_child_code = node_data.get("right_child")
-            if right_child_code and right_child_code in self.node_map:
-                right_child = self.node_map[right_child_code]
-                current_node.right = right_child
-                right_child.parent = current_node
-        
-        return root
-    
-    def get_flights_for_insertion(self) -> List[FlightNode]:
-        """
-        Get the list of flights for insertion mode.
-        
-        Returns:
-            List[FlightNode]: List of flight nodes ready for sequential insertion.
-        """
-        return self.flights_list.copy()
-    
     def get_raw_data(self) -> Optional[dict]:
         """
         Get the raw loaded JSON data.
@@ -251,3 +69,67 @@ class DataLoader:
             dict: Raw JSON data, or None if not loaded.
         """
         return self.raw_data
+
+    def get_parsed_flights(self):
+        """
+        Get flights from loaded insertion-mode JSON, parsed as FlightNode objects.
+        
+        ONLY call this after successful validation in insertion mode.
+        
+        Returns:
+            List[FlightNode]: Flight objects parsed from the JSON.
+        """
+        if not self.raw_data or "flights" not in self.raw_data:
+            return []
+        
+        flights = []
+        for flight_data in self.raw_data.get("flights", []):
+            if isinstance(flight_data, dict) and "flight_code" in flight_data:
+                node = FlightNode.from_dict(flight_data)
+                flights.append(node)
+        
+        return flights
+
+    def validate_json_stream(self, stream, load_type: Literal["topology", "insertion"]) -> Tuple[Optional[dict], Optional[str]]:
+        """
+        Load JSON from stream and validate it matches the expected load_type.
+        
+        Automatically detects the actual JSON structure type and ensures it matches
+        what the user requested. This prevents loading topology JSON when insertion
+        is expected, and vice versa.
+        
+        Args:
+            stream: Readable stream with JSON content.
+            load_type: Expected type ("topology" or "insertion").
+        
+        Returns:
+            Tuple[Optional[Dict], Optional[str]]: (validated_data, error_message).
+                - If successful: error_message is None.
+                - If any error: data is None and error_message is descriptive.
+        """
+        # Step 1: Load and parse JSON
+        ok, error = self.load_from_stream(stream)
+        if not ok:
+            return None, error or "No se pudo leer el JSON"
+        
+        data = self.get_raw_data()
+        if not isinstance(data, dict):
+            return None, "El JSON debe ser un objeto raíz válido"
+        
+        # Step 2: Auto-detect actual type from structure
+        detected_type = self.get_reconstruction_mode()
+        if detected_type == "unknown":
+            return None, (
+                "El archivo JSON no contiene una estructura válida. "
+                "Debe ser topología (root_code + tree_structure) "
+                "o inserción (flights list)."
+            )
+        
+        # Step 3: Validate detected type matches expected type
+        if detected_type != load_type:
+            return None, (
+                f"El archivo es de tipo {detected_type}, "
+                f"pero se esperaba {load_type}."
+            )
+        
+        return data, None

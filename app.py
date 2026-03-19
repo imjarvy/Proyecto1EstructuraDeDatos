@@ -5,7 +5,6 @@ REST API layer that bridges the Python backend with the HTML/JS frontend.
 Only exposes endpoints for functionality already implemented in Python modules.
 """
 
-import json
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
@@ -19,11 +18,8 @@ from src.routes.queue_routes import queue_bp, init_queue # Importar el blueprint
 
 from src.modelos.AVLTree import AVLTree
 from src.modelos.BST import BST
-from src.modelos.FlightNode import FlightNode
 from src.negocio.AVLTreeManager import AVLTreeManager
-from src.acceso_datos.DataPersistence import DataPersistence
-from src.acceso_datos.VersionManager import VersionManager
-from src.acceso_datos.TreeAnalysisManager import TreeAnalysisManager
+from src.negocio.TreeAnalysisManager import TreeAnalysisManager
 
 app = Flask(
     __name__,
@@ -57,8 +53,7 @@ bst_tree       = BST()
 
 # 3. Inicializar la cola con el árbol compartido (después de crear manager)
 init_queue(manager)
-persistence    = DataPersistence()
-versions       = VersionManager()
+data_storage   = DataStorage()
 analysis       = TreeAnalysisManager()
 critical_depth = 5
 
@@ -100,7 +95,7 @@ def _tree_payload() -> dict:
     traversal orders, and undo availability.
     """
     t    = manager.tree
-    meta = persistence.get_tree_metadata(t.root)
+    meta = data_storage.get_tree_metadata(t.root)
 
     breadth_codes = []
     depth_codes   = []
@@ -143,61 +138,6 @@ def _bst_payload() -> dict:
     }
 
 
-def _reconstruct_from_topology(data: dict) -> bool:
-    """Rebuild manager.tree from topology JSON (root_code + tree_structure)."""
-    global manager
-    tree_structure = data.get("tree_structure")
-    root_code      = data.get("root_code")
-    if not tree_structure or not root_code:
-        return False
-
-    node_map = {}
-    for code, entry in tree_structure.items():
-        node_map[code] = FlightNode.from_dict(entry["flight_data"])
-
-    root_node = node_map.get(root_code)
-    if root_node is None:
-        return False
-
-    for code, entry in tree_structure.items():
-        current = node_map[code]
-        lc = entry.get("left_child")
-        rc = entry.get("right_child")
-        if lc and lc in node_map:
-            current.left = node_map[lc]
-            node_map[lc].parent = current
-        if rc and rc in node_map:
-            current.right = node_map[rc]
-            node_map[rc].parent = current
-
-    current_stress_mode = manager.tree.stress_mode
-    new_avl       = AVLTree(stress_mode=current_stress_mode)
-    new_avl.root  = root_node
-    manager.tree  = new_avl
-    manager._undo_stack.clear()
-    return True
-
-
-def _reconstruct_from_insertion(data: dict) -> bool:
-    """Rebuild manager.tree (AVL) and bst_tree by sequential insertion."""
-    global manager, bst_tree
-    flights = data.get("flights", [])
-    if not flights:
-        return False
-
-    current_stress_mode = manager.tree.stress_mode
-    new_avl  = AVLTree(stress_mode=current_stress_mode)
-    bst_tree = BST()
-
-    for fd in flights:
-        new_avl.insert(FlightNode.from_dict(fd))
-        bst_tree.insert(FlightNode.from_dict(fd))
-
-    manager.tree = new_avl
-    manager._undo_stack.clear()
-    return True
-
-
 # ===========================================================================
 # ROUTES
 # ===========================================================================
@@ -222,46 +162,46 @@ def tree_state():
 def load_tree():
     """
     Accept a JSON file upload and rebuild the in-memory tree(s).
+    
+    All file reading, validation, and reconstruction is orchestrated by DataStorage.
+    This endpoint only coordinates the HTTP request/response and syncs to manager.
 
-    Topology JSON must contain: root_code + tree_structure.
-    Insertion JSON must contain: flights (list of flight objects).
+    Parameters (form data):
+        - file: Uploaded JSON file
+        - type: "topology" or "insertion" (default: "topology")
 
-    Returns a descriptive error if the JSON format does not match the mode.
+    Expected JSON formats:
+    - Topology: Contains root_code + tree_structure
+    - Insertion: Contains flights (list of flight objects)
     """
+    global manager, bst_tree
+    
     file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No se proporcionó ningún archivo"}), 400
-
     load_type = request.form.get("type", "topology")
-
-    try:
-        data = json.load(file)
-    except json.JSONDecodeError as exc:
-        return jsonify({"error": f"JSON inválido: {exc}"}), 400
-
-    # Bug fix #2: validate format before attempting reconstruction
-    if load_type == "topology":
-        if "root_code" not in data or "tree_structure" not in data:
-            return jsonify({
-                "error": "El archivo no es de tipo Topología. "
-                         "Debe contener 'root_code' y 'tree_structure'."
-            }), 422
-        ok = _reconstruct_from_topology(data)
-    else:
-        if "flights" not in data:
-            return jsonify({
-                "error": "El archivo no es de tipo Inserción. "
-                         "Debe contener la clave 'flights' con una lista de vuelos."
-            }), 422
-        ok = _reconstruct_from_insertion(data)
-
-    if not ok:
-        return jsonify({"error": "No se pudo reconstruir el árbol con los datos proporcionados"}), 422
-
+    
+    # All loading, validation, and reconstruction is handled by DataStorage
+    avl, bst, error = data_storage.load_and_reconstruct(file, load_type)
+    
+    if error:
+        # Determine HTTP status: 400 for missing file, 422 for validation/format errors
+        status = 400 if "No se proporcionó" in error else 422
+        return jsonify({"error": error}), status
+    
+    # Sync reconstructed tree to manager (preserve stress_mode and clear undo stack)
+    current_stress_mode = manager.tree.stress_mode
+    avl.stress_mode = current_stress_mode
+    manager.tree = avl
+    manager._undo_stack.clear()
+    
+    # Only update BST if insertion mode
+    if bst is not None:
+        bst_tree = bst
+    
+    # Build response with both trees if insertion mode, only AVL if topology mode
     response = {"tree": _tree_payload()}
     if load_type == "insertion":
         response["bst_tree"] = _bst_payload()
-
+    
     return jsonify(response)
 
 
@@ -274,7 +214,7 @@ def export_tree():
     """Serialize the current AVL tree for JSON download."""
     if manager.tree.root is None:
         return jsonify({"error": "El árbol está vacío"}), 400
-    serialized = persistence.serialize_tree_for_storage(manager.tree.root)
+    serialized = data_storage.serialize_tree(manager.tree.root)
     return jsonify(serialized)
 
 
@@ -507,7 +447,7 @@ def save_version():
     version_name = body.get("version_name", "").strip()
     if not version_name:
         return jsonify({"error": "version_name es requerido"}), 400
-    ok = versions.save_version(manager.tree.root, version_name)
+    ok = data_storage.save_avl_version(version_name, manager.tree.root)
     return jsonify({"success": ok})
 
 
@@ -520,23 +460,16 @@ def restore_version():
     if not version_name:
         return jsonify({"error": "version_name es requerido"}), 400
 
-    version_file = versions._find_file_by_version_name(version_name)
-    if version_file is None:
-        return jsonify({"error": f"Version '{version_name}' not found"}), 404
-    
-    payload = versions._read_version_file(version_file)
-    root = versions.restore_version(version_name)
-    if root is None:
-        return jsonify({"error": f"Version '{version_name}' not found"}), 404
-    root = versions.restore_version(version_name)
+    root = data_storage.restore_avl_version(version_name)
     if root is None:
         return jsonify({"error": f"Versión '{version_name}' no encontrada"}), 404
+
+    meta = data_storage.get_version_info(version_name) or {}
 
     current_stress_mode = manager.tree.stress_mode
     new_avl       = AVLTree(stress_mode=current_stress_mode)
     new_avl.root  = root
-    
-    meta = payload.get("metadata", {})
+
     saved_rotations = meta.get("rotation_count")
     if isinstance(saved_rotations, dict):
         new_avl.rotation_count = saved_rotations
@@ -551,7 +484,7 @@ def restore_version():
 @app.route("/api/list-versions", methods=["GET"])
 def list_versions():
     """Return metadata for all saved versions."""
-    return jsonify({"versions": versions.get_all_versions_info()})
+    return jsonify({"versions": data_storage.get_all_versions_info()})
 
 
 @app.route("/api/delete-version", methods=["POST"])
@@ -559,7 +492,7 @@ def delete_version():
     """Delete a saved version. Body: { version_name }"""
     body         = request.get_json(silent=True) or {}
     version_name = body.get("version_name", "").strip()
-    ok           = versions.delete_version(version_name)
+    ok           = data_storage.delete_version(version_name)
     return jsonify({"success": ok})
 
 

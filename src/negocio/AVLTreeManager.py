@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, List
 
 from src.modelos.AVLTree import AVLTree
 from src.modelos.FlightNode import FlightNode
-from src.acceso_datos.DataPersistence import DataPersistence
+from src.acceso_datos.DataStorage import DataStorage
 
 
 # Fields that can be updated without changing the BST key (flight_code).
@@ -44,7 +44,7 @@ class AVLTreeManager:
                                       empty tree when not provided.
         """
         self.tree: AVLTree = tree if tree is not None else AVLTree()
-        self._persistence = DataPersistence()
+        self._storage = DataStorage()
         self._undo_stack: List[Dict[str, Any]] = []
         
 
@@ -53,7 +53,7 @@ class AVLTreeManager:
     def _snapshot_state(self) -> Dict[str, Any]:
         """Capture full reversible AVL state for Ctrl+Z operations."""
         return {
-            "tree_data": self._persistence.serialize_tree_for_storage(self.tree.root),
+            "tree_data": self._storage.serialize_tree(self.tree.root),
             "rotation_count": self.tree.rotation_count.copy(),
             "cascade_rebalance_count": self.tree.cascade_rebalance_count,
             "mass_cancellation_count": self.tree.mass_cancellation_count,
@@ -84,7 +84,7 @@ class AVLTreeManager:
         if tree_data is None:
             self.tree.root = None
         else:
-            restored_root = self._persistence.deserialize_tree_from_dict(tree_data)
+            restored_root = self._storage.deserialize_tree_data(tree_data)
             self.tree.root = restored_root
 
         self.tree.rotation_count = snapshot.get("rotation_count", self.tree.rotation_count.copy())
