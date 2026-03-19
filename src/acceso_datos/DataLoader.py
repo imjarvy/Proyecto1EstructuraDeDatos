@@ -74,8 +74,6 @@ class DataLoader:
         """
         Get flights from loaded insertion-mode JSON, parsed as FlightNode objects.
         
-        ONLY call this after successful validation in insertion mode.
-        
         Returns:
             List[FlightNode]: Flight objects parsed from the JSON.
         """
@@ -92,11 +90,7 @@ class DataLoader:
 
     def validate_json_stream(self, stream, load_type: Literal["topology", "insertion"]) -> Tuple[Optional[dict], Optional[str]]:
         """
-        Load JSON from stream and validate it matches the expected load_type.
-        
-        Automatically detects the actual JSON structure type and ensures it matches
-        what the user requested. This prevents loading topology JSON when insertion
-        is expected, and vice versa.
+        Load JSON from stream and validate it matches the expected load_type. This prevents loading topology JSON when insertion is expected, and vice versa.
         
         Args:
             stream: Readable stream with JSON content.

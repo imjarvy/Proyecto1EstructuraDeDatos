@@ -27,48 +27,14 @@ class DataStorage:
         self.loader = DataLoader()
         self.persistence = DataPersistence()
         self.version_manager = VersionManager()
-        self.current_avl_root = None
-        self.current_bst_root = None
 
     def _clone_flight_node(self, node: FlightNode) -> FlightNode:
         """Create an independent copy of a flight node."""
         return FlightNode.from_dict(node.to_dict())
 
-    def _set_current_roots(
-        self,
-        avl_root: Optional[FlightNode],
-        bst_root: Optional[FlightNode],
-    ) -> None:
-        """Update current AVL/BST roots in one place."""
-        self.current_avl_root = avl_root
-        self.current_bst_root = bst_root
-
     # ============================================================================
     # PERSISTENCE OPERATIONS
     # ============================================================================
-
-    def load_uploaded_json(self, uploaded_file) -> Tuple[Optional[Dict], Optional[str]]:
-        """
-        Read and parse an uploaded JSON file via DataLoader.
-
-        Args:
-            uploaded_file: Flask FileStorage-like object.
-
-        Returns:
-            Tuple[Optional[Dict], Optional[str]]: (parsed_data, error_message).
-        """
-        if uploaded_file is None:
-            return None, "No se proporcionó ningún archivo"
-
-        stream = getattr(uploaded_file, "stream", uploaded_file)
-        ok, error = self.loader.load_from_stream(stream)
-        if not ok:
-            return None, error or "No se pudo leer el JSON"
-
-        data = self.loader.get_raw_data()
-        if not isinstance(data, dict):
-            return None, "El JSON debe tener un objeto raíz"
-        return data, None
 
     def load_and_reconstruct(
         self,
@@ -89,9 +55,6 @@ class DataStorage:
         Returns:
             Tuple[Optional[AVLTree], Optional[BST], Optional[str]]: 
                 (avl_tree, bst_tree, error_message).
-                - If successful: error_message is None.
-                - If topology mode: bst_tree is None.
-                - If any error: both trees are None.
         """
         if uploaded_file is None:
             return None, None, "No se proporcionó ningún archivo"
@@ -111,7 +74,6 @@ class DataStorage:
                 avl = self.reconstruct_avl_from_dict(data)
                 if avl is None:
                     return None, None, "No se pudo reconstruir el árbol AVL desde la topología"
-                self._set_current_roots(avl.root, None)
                 return avl, None, None
             
             elif load_type == "insertion":
@@ -123,7 +85,6 @@ class DataStorage:
                 if result is None:
                     return None, None, "No se pudo reconstruir los árboles desde el modo inserción"
                 avl, bst = result
-                self._set_current_roots(avl.root, bst.root)
                 return avl, bst, None
             
             else:
@@ -132,7 +93,7 @@ class DataStorage:
         except Exception as e:
             return None, None, f"Error durante la reconstrucción: {str(e)}"
 
-    def serialize_tree(self, root: Optional[FlightNode] = None) -> Optional[Dict]:
+    def serialize_tree(self, root: FlightNode) -> Optional[Dict]:
         """
         Serialize a tree root to dictionary for in-memory storage.
 
@@ -144,9 +105,29 @@ class DataStorage:
         Returns:
             dict: Serialized tree structure, or None if root is empty.
         """
-        if root is None:
-            root = self.current_avl_root
         return self.persistence.serialize_tree_for_storage(root)
+
+    def export_tree(
+        self,
+        root: Optional[FlightNode] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Export tree to JSON in the user's Downloads folder.
+
+        Args:
+            root (FlightNode, optional): Root to export. Uses current AVL root when omitted.
+
+        Returns:
+            Tuple[bool, Optional[str]]: (success, error_message).
+        """
+        if root is None:
+            return False, "El árbol está vacío"
+
+        success = self.persistence.export_tree_to_downloads(root)
+        if not success:
+            return False, "No se pudo exportar el árbol a archivo"
+
+        return True, None
 
     def deserialize_tree_data(self, data: Dict) -> Optional[FlightNode]:
         """
@@ -193,20 +174,34 @@ class DataStorage:
     # VERSION MANAGEMENT OPERATIONS
     # ============================================================================
 
-    def save_avl_version(self, version_name: str, root: Optional[FlightNode] = None) -> bool:
+    def save_avl_version(
+        self,
+        version_name: str,
+        root: Optional[FlightNode] = None,
+        rotation_count: Optional[Dict] = None,
+        cascade_rebalance_count: int = 0,
+        mass_cancellation_count: int = 0,
+    ) -> bool:
         """
         Save current AVL tree state as a named version.
         
         Args:
             version_name (str): Descriptive name for this version.
             root (FlightNode): Optional root to persist.
+            rotation_count (dict, optional): Rotation counters to persist.
+            cascade_rebalance_count (int, optional): Global rebalance counter.
+            mass_cancellation_count (int, optional): Mass cancellation counter.
             
         Returns:
             bool: True if save successful, False otherwise.
         """
-        if root is None:
-            root = self.current_avl_root
-        return self.version_manager.save_version(root, version_name)
+        return self.version_manager.save_version(
+            root,
+            version_name,
+            rotation_count=rotation_count,
+            cascade_rebalance_count=cascade_rebalance_count,
+            mass_cancellation_count=mass_cancellation_count,
+        )
     
     def restore_avl_version(self, version_name: str) -> Optional[FlightNode]:
         """
@@ -219,8 +214,6 @@ class DataStorage:
             FlightNode: Root node of restored tree, or None if failed.
         """
         root = self.version_manager.restore_version(version_name)
-        if root:
-            self.current_avl_root = root
         return root
     
     def get_version_info(self, version_name: str) -> Optional[Dict]:
@@ -265,8 +258,6 @@ class DataStorage:
         Rebuild an AVL tree from an already-parsed topology dict.
 
         Expected keys: root_code, tree_structure.
-        Delegates deserialization to DataPersistence so there is a single
-        source of truth for the topology format.
 
         Args:
             data (Dict): Parsed JSON payload in topology format.
@@ -274,7 +265,7 @@ class DataStorage:
         Returns:
             AVLTree: Reconstructed tree, or None if data is invalid.
         """
-        root = self.persistence.deserialize_tree_from_dict(data)
+        root = self.deserialize_tree_data(data)
         if root is None:
             return None
         avl = AVLTree()
@@ -290,9 +281,6 @@ class DataStorage:
         """
         Rebuild AVL and BST by inserting flights from an already-parsed dict.
 
-        Delegates flight parsing to DataLoader, so all JSON→FlightNode conversion
-        is centralized in one place.
-
         Expected key: flights (list of flight dicts).
 
         Args:
@@ -301,7 +289,7 @@ class DataStorage:
         Returns:
             Tuple[AVLTree, BST]: Both reconstructed trees, or None if invalid.
         """
-        # Use DataLoader's parsed flights (centralized parsing)
+        # Use DataLoader's parsed flights
         flights = self.loader.get_parsed_flights()
         if not flights:
             return None

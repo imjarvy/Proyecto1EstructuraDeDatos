@@ -100,10 +100,8 @@ class VersionManager:
         Args:
             root (FlightNode): Root node of the tree to serialize
             version_name (str): User-provided descriptive name for this version
-            rotation_count (dict, optional): Rotation counters {LL, RR, LR, RL}.
-                                           Defaults to zeros if not provided.
+            rotation_count (dict, optional): Rotation counters {LL, RR, LR, RL}
             cascade_rebalance_count (int, optional): Number of cascade rebalancing
-                                                    operations performed. Default: 0
             mass_cancellation_count (int, optional): Reserved for future use. Default: 0
             
         Returns:

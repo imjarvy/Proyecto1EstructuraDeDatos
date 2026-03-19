@@ -211,11 +211,16 @@ def load_tree():
 
 @app.route("/api/export-tree", methods=["GET"])
 def export_tree():
-    """Serialize the current AVL tree for JSON download."""
-    if manager.tree.root is None:
-        return jsonify({"error": "El árbol está vacío"}), 400
-    serialized = data_storage.serialize_tree(manager.tree.root)
-    return jsonify(serialized)
+    """Export current AVL tree to Downloads via DataStorage."""
+    success, error = data_storage.export_tree(manager.tree.root)
+    if error:
+        status = 400 if "vacío" in error else 500
+        return jsonify({"error": error}), status
+
+    if not success:
+        return jsonify({"error": "No se pudo exportar el árbol"}), 500
+
+    return jsonify({"message": "Arbol exportado en Descargas"})
 
 
 # ---------------------------------------------------------------------------
@@ -447,7 +452,13 @@ def save_version():
     version_name = body.get("version_name", "").strip()
     if not version_name:
         return jsonify({"error": "version_name es requerido"}), 400
-    ok = data_storage.save_avl_version(version_name, manager.tree.root)
+    ok = data_storage.save_avl_version(
+        version_name,
+        manager.tree.root,
+        rotation_count=manager.tree.rotation_count,
+        cascade_rebalance_count=manager.tree.cascade_rebalance_count,
+        mass_cancellation_count=manager.tree.mass_cancellation_count,
+    )
     return jsonify({"success": ok})
 
 

@@ -50,14 +50,7 @@ export function registerHandlers({
   document.getElementById("exportTreeBtn").addEventListener("click", async () => {
     try {
       const data = await api("/api/export-tree");
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "skybalance_tree.json";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      showToast("Arbol exportado", "success");
+      showToast(data.message || "Arbol exportado en Descargas", "success");
     } catch (_) {}
   });
 

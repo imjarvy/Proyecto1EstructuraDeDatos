@@ -6,6 +6,7 @@ hierarchical structure with all node properties.
 """
 
 import json
+import os
 from typing import Optional, Dict, Any
 from src.modelos.FlightNode import FlightNode
 
@@ -41,13 +42,10 @@ class DataPersistence:
             return False
         
         try:
-            export_data = {
-                "root_code": root.flight_code,
-                "tree_structure": {}
-            }
-            
-            # Traverse tree and collect all nodes with their relationships
-            self._traverse_and_collect(root, export_data["tree_structure"])
+            export_data = self.serialize_tree_for_storage(root)
+            if export_data is None:
+                print("Error: Could not serialize tree for export.")
+                return False
             
             # Write to file
             with open(file_path, 'w', encoding='utf-8') as file:
@@ -63,6 +61,32 @@ class DataPersistence:
         except Exception as e:
             print(f"Unexpected error during export: {e}")
             return False
+
+    def export_tree_to_downloads(
+        self,
+        root: Optional[FlightNode],
+        file_name: str = "skybalance_tree.json",
+    ) -> bool:
+        """
+        Export tree JSON into the current user's Downloads folder.
+
+        Args:
+            root (FlightNode): Root node of the tree to export.
+            file_name (str): Output filename for the exported JSON.
+
+        Returns:
+            bool: True if export successful, False otherwise.
+        """
+        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        os.makedirs(downloads_dir, exist_ok=True)
+        base, ext = os.path.splitext(file_name)  
+        file_path = os.path.join(downloads_dir, file_name)
+
+        counter = 1
+        while os.path.exists(file_path):
+            file_path = os.path.join(downloads_dir, f"{base}({counter}){ext}")
+            counter += 1
+        return self.export_tree_to_json(root, file_path)
     
     def _traverse_and_collect(self, node: FlightNode, tree_dict: Dict[str, Any]):
         """
