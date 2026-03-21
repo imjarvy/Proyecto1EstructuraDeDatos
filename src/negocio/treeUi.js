@@ -64,13 +64,28 @@ export function createTreeUi({ state, showToast }) {
       return children.length ? children : null;
     });
 
-    d3Api.tree().size([width, height])(hierarchy);
+    // nodeSize keeps spacing fixed regardless of how many nodes exist,
+    // so 2 nodes won't be stretched across the full container width.
+    const NODE_W = 80;   // horizontal gap between siblings
+    const NODE_H = 80;   // vertical gap between levels
+    d3Api.tree().nodeSize([NODE_W, NODE_H])(hierarchy);
+
+    // After nodeSize the root sits at x=0; shift everything so it's centered.
+    const nodes = hierarchy.descendants();
+    const minX = Math.min(...nodes.map(d => d.x));
+    const maxX = Math.max(...nodes.map(d => d.x));
+    const treeWidth  = maxX - minX;
+    const treeHeight = Math.max(...nodes.map(d => d.y));
+    const offsetX = (width / 2) - (treeWidth / 2) - minX;
+    const offsetY = 0;
 
     group.selectAll(".link")
       .data(hierarchy.links())
       .join("path")
       .attr("class", "link")
-      .attr("d", d3Api.linkVertical().x(data => data.x).y(data => data.y));
+      .attr("d", d3Api.linkVertical()
+        .x(data => data.x + offsetX)
+        .y(data => data.y + offsetY));
 
     const node = group.selectAll(".node")
       .data(hierarchy.descendants())
@@ -83,7 +98,7 @@ export function createTreeUi({ state, showToast }) {
         if (data.data.flight_code === state.selectedCode) cssClass += " node-selected";
         return cssClass;
       })
-      .attr("transform", data => `translate(${data.x},${data.y})`)
+      .attr("transform", data => `translate(${data.x + offsetX},${data.y + offsetY})`)
       .style("cursor", "pointer")
       .on("click", (_, data) => selectNode(data.data));
 
@@ -124,7 +139,6 @@ export function createTreeUi({ state, showToast }) {
     document.getElementById("nodesValue").textContent = treeData.node_count ?? 0;
 
     document.getElementById("rotationsValue").textContent = metrics.total_rotations ?? 0;
-    document.getElementById("currentHeight").textContent = treeData.height ?? 0;
     document.getElementById("llRotations").textContent = metrics.LL ?? 0;
     document.getElementById("rrRotations").textContent = metrics.RR ?? 0;
     document.getElementById("lrRotations").textContent = metrics.LR ?? 0;
@@ -132,9 +146,9 @@ export function createTreeUi({ state, showToast }) {
     document.getElementById("massCancellations").textContent = metrics.mass_cancellations ?? 0;
 
     document.getElementById("breadthTraversal").textContent =
-      (treeData.breadth_order || []).join(" -> ") || "-";
+      (treeData.breadth_order || []).join(" → ") || "—";
     document.getElementById("depthTraversal").textContent =
-      (treeData.depth_order || []).join(" -> ") || "-";
+      (treeData.depth_order || []).join(" → ") || "—";
 
     document.getElementById("undoBtn").disabled = !treeData.can_undo;
 
@@ -151,7 +165,9 @@ export function createTreeUi({ state, showToast }) {
     document.getElementById("bstSection").classList.remove("hidden");
     document.getElementById("bstRoot").textContent = bstData.root?.flight_code ?? "-";
     document.getElementById("bstHeight").textContent = bstData.height ?? 0;
-    document.getElementById("bstLeaves").textContent = bstData.leaf_count ?? 0;
+    // bstLeaves removed from new layout (compact BST header)
+    const bstLeaves = document.getElementById("bstLeaves");
+    if (bstLeaves) bstLeaves.textContent = bstData.leaf_count ?? 0;
     document.getElementById("bstNodes").textContent = bstData.node_count ?? 0;
     renderTree(bstData.root, "bstSvg", "bstContainer");
   }
@@ -178,20 +194,22 @@ export function createTreeUi({ state, showToast }) {
     document.getElementById("deleteFlightBtn").disabled = false;
     document.getElementById("cancelFlightBtn").disabled = false;
 
+    // Update detail header code label
+    const detailCode = document.getElementById("nodeDetailCode");
+    if (detailCode) detailCode.textContent = nodeData.flight_code;
+
     document.getElementById("nodeDetail").classList.remove("hidden");
     document.getElementById("nodeDetailContent").innerHTML = `
-      <p><strong>Codigo:</strong>         ${nodeData.flight_code}</p>
-      <p><strong>Ruta:</strong>           ${nodeData.origin} -> ${nodeData.destination}</p>
-      <p><strong>Precio base:</strong>    $${(nodeData.base_price || 0).toFixed(2)}</p>
-      <p><strong>Precio final:</strong>   $${(nodeData.final_price || 0).toFixed(2)}
-         ${nodeData.is_critical ? '<span class="critical-tag">+25%</span>' : ""}</p>
-      <p><strong>Pasajeros:</strong>      ${nodeData.passengers}</p>
-      <p><strong>Promocion:</strong>      ${((nodeData.promotion || 0) * 100).toFixed(0)}%</p>
-      <p><strong>Prioridad:</strong>      ${nodeData.priority}</p>
-      <p><strong>Altura nodo:</strong>    ${nodeData.height}</p>
-      <p><strong>Factor balance:</strong> ${nodeData.balance_factor}</p>
-      <p><strong>Profundidad:</strong>    ${nodeData.depth}</p>
-      ${nodeData.alert ? `<p><strong>Alerta:</strong> ${nodeData.alert}</p>` : ""}
+      <p><strong>Ruta</strong>           <span>${nodeData.origin} → ${nodeData.destination}</span></p>
+      <p><strong>Precio base</strong>    <span>$${(nodeData.base_price || 0).toFixed(2)}</span></p>
+      <p><strong>Precio final</strong>   <span>$${(nodeData.final_price || 0).toFixed(2)}${nodeData.is_critical ? '<span class="critical-tag">+25%</span>' : ""}</span></p>
+      <p><strong>Pasajeros</strong>      <span>${nodeData.passengers}</span></p>
+      <p><strong>Promoción</strong>      <span>${((nodeData.promotion || 0) * 100).toFixed(0)}%</span></p>
+      <p><strong>Prioridad</strong>      <span>${nodeData.priority}</span></p>
+      <p><strong>Altura nodo</strong>    <span>${nodeData.height}</span></p>
+      <p><strong>Factor balance</strong> <span>${nodeData.balance_factor}</span></p>
+      <p><strong>Profundidad</strong>    <span>${nodeData.depth}</span></p>
+      ${nodeData.alert ? `<p><strong>Alerta</strong> <span>${nodeData.alert}</span></p>` : ""}
     `;
   }
 
@@ -225,7 +243,7 @@ export function createTreeUi({ state, showToast }) {
     const basePrice = parseFloat(document.getElementById("basePrice").value);
 
     if (!flightCode || !origin || !destination || Number.isNaN(basePrice)) {
-      showToast("Completa los campos requeridos: Codigo, Origen, Destino, Precio Base", "error");
+      showToast("Completa los campos requeridos: Código, Origen, Destino, Precio Base", "error");
       return null;
     }
 

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SkyBalance AVL - Sistema de Gestión Aérea</title>
+  <title>SkyBalance AVL</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/estilos/styles.css" />
 </head>
 <body>
@@ -14,242 +14,307 @@
 <header id="appHeader">
   <div class="header-brand">
     <span class="brand-icon">✈</span>
-    <div>
-      <h1>SkyBalance<span class="brand-avl">AVL</span></h1>
-      <p class="brand-sub">Sistema de Gestión Aérea</p>
-    </div>
+    <span class="brand-name">SkyBalance <strong>AVL</strong></span>
   </div>
-
-  <!-- Global action buttons -->
   <div id="headerButtons">
     <button id="loadJsonBtn">Cargar JSON</button>
     <button id="exportTreeBtn">Exportar JSON</button>
-    <button id="stressModeBtn">Activar Modo Estrés</button>
-    <button id="globalRebalanceBtn">Rebalanceo Global</button>
+    <button id="stressModeBtn">Modo Estrés</button>
     <button id="undoBtn" disabled>↩ Deshacer</button>
-    <button id="deleteLeastProfitable">Eliminar Menor Rentabilidad</button>
-    <button id="auditAvlBtn" style="display:none;">Verificar Propiedad AVL</button>
+    <button id="deleteLeastProfitable">Eliminar Menos Rentable</button>
+    <button id="auditAvlBtn" style="display:none;">Auditar AVL</button>
   </div>
 </header>
 
-<!-- Banner shown only while stress mode is active -->
 <div id="stressBanner" class="stress-banner hidden">
   ⚡ MODO ESTRÉS ACTIVO — balanceo diferido
 </div>
 
-<!-- ======= MAIN CONTENT ======= -->
-<main>
+<!-- ======= APP BODY ======= -->
+<div id="appBody">
 
-  <!-- AVL tree visualisation (full width) -->
-  <section id="treeSection">
-    <div class="section-header">
-      <h3>Visualización del Árbol AVL</h3>
+  <!-- LEFT: árbol fijo -->
+  <aside id="treePanel">
+    <div class="panel-header">
+      <span class="panel-title">Árbol AVL</span>
       <div class="tree-legend">
+        <span class="legend-item"><span class="dot dot-root"></span>Raíz</span>
         <span class="legend-item"><span class="dot dot-normal"></span>Normal</span>
         <span class="legend-item"><span class="dot dot-critical"></span>Crítico</span>
-        <span class="legend-item"><span class="dot dot-root"></span>Raíz</span>
       </div>
     </div>
+
     <div id="treeContainer">
-      <!-- Placeholder shown when no tree is loaded -->
       <div id="emptyState">
-        <p>🛫 Carga un archivo JSON para visualizar el árbol</p>
+        <div class="empty-icon">✈</div>
+        <p>Carga un JSON para visualizar el árbol</p>
       </div>
       <svg id="treeSvg"></svg>
     </div>
 
-    <!-- BST comparison panel — only shown in insertion mode -->
+    <!-- BST comparativo -->
     <div id="bstSection" class="hidden">
-      <div class="section-header" style="margin-top:1.5rem">
-        <h3>Árbol BST (sin balanceo automático)</h3>
+      <div class="panel-header" style="margin-top:1rem">
+        <span class="panel-title">BST Comparativo</span>
+        <div id="bstProperties">
+          <span>Raíz: <strong id="bstRoot">—</strong></span>
+          <span>Altura: <strong id="bstHeight">0</strong></span>
+          <span>Nodos: <strong id="bstNodes">0</strong></span>
+        </div>
       </div>
       <div id="bstContainer">
         <svg id="bstSvg"></svg>
       </div>
-      <div id="bstProperties">
-        <p><strong>Raíz BST:</strong> <span id="bstRoot">—</span></p>
-        <p><strong>Altura:</strong>   <span id="bstHeight">0</span></p>
-        <p><strong>Hojas:</strong>    <span id="bstLeaves">0</span></p>
-        <p><strong>Nodos:</strong>    <span id="bstNodes">0</span></p>
+    </div>
+  </aside>
+
+  <!-- RIGHT: controles en scroll -->
+  <main id="controlPanel">
+
+    <!-- MÉTRICAS DEL ÁRBOL -->
+    <section class="card">
+      <h3 class="card-title">Estado del Árbol</h3>
+      <div class="stats-grid">
+        <div class="stat"><span class="stat-label">Raíz</span><span class="stat-value" id="rootValue">—</span></div>
+        <div class="stat"><span class="stat-label">Altura</span><span class="stat-value" id="heightValue">0</span></div>
+        <div class="stat"><span class="stat-label">Nodos</span><span class="stat-value" id="nodesValue">0</span></div>
+        <div class="stat"><span class="stat-label">Hojas</span><span class="stat-value" id="leavesValue">0</span></div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Tree structural properties -->
-  <section id="propertiesSection">
-    <h3>Propiedades del Árbol</h3>
-    <div id="properties">
-      <p><strong>Raíz:</strong>              <span id="rootValue">-</span></p>
-      <p><strong>Altura:</strong>             <span id="heightValue">0</span></p>
-      <p><strong>Hojas:</strong>              <span id="leavesValue">0</span></p>
-      <p><strong>Nodos:</strong>              <span id="nodesValue">0</span></p>
-      <p><strong>Rotaciones Totales:</strong> <span id="rotationsValue">0</span></p>
-    </div>
-  </section>
+    <!-- GESTIÓN DE VUELOS -->
+    <section class="card">
+      <h3 class="card-title">Gestión de Vuelos</h3>
+      <div id="flightForm">
+        <div class="field-group">
+          <label>Código</label>
+          <input type="text" id="flightCode" placeholder="Ej: AA101" maxlength="8" />
+        </div>
+        <div class="field-group">
+          <label>Origen</label>
+          <input type="text" id="origin" placeholder="Ciudad origen" maxlength="30" />
+        </div>
+        <div class="field-group">
+          <label>Destino</label>
+          <input type="text" id="destination" placeholder="Ciudad destino" maxlength="30" />
+        </div>
+        <div class="field-group">
+          <label>Precio Base</label>
+          <input type="number" id="basePrice" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="field-group">
+          <label>Pasajeros</label>
+          <input type="number" id="passengers" placeholder="0" value="0" />
+        </div>
+        <div class="field-group">
+          <label>Promoción (0–1)</label>
+          <input type="number" id="promotion" placeholder="0.00" step="0.01" min="0" max="1" value="0" />
+        </div>
+        <div class="field-group field-full">
+          <label>Alerta</label>
+          <select id="alert">
+            <option value="">Sin alerta</option>
+            <option value="Retraso">Retraso</option>
+            <option value="Cancelado">Cancelado</option>
+            <option value="Embarque">Embarque</option>
+            <option value="Sobreventa">Sobreventa</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+            <option value="Clima">Clima</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Prioridad</label>
+          <select id="priority">
+            <option value="1">1 — Baja</option>
+            <option value="2">2</option>
+            <option value="3" selected>3 — Media</option>
+            <option value="4">4</option>
+            <option value="5">5 — Alta</option>
+          </select>
+        </div>
+        <div class="field-full btn-row">
+          <button id="addFlightBtn" class="btn btn-green">Agregar</button>
+          <button id="editFlightBtn" class="btn btn-blue" disabled>Editar</button>
+          <button id="deleteFlightBtn" class="btn btn-red" disabled>Eliminar</button>
+          <button id="cancelFlightBtn" class="btn btn-yellow" disabled>Cancelar Vuelo</button>
+        </div>
+      </div>
 
-  <!-- Flight CRUD form -->
-  <section id="controlsSection">
-    <h3>Gestión de Vuelos</h3>
-    <div id="flightForm">
-      <input type="text"   id="flightCode"   placeholder="Código de Vuelo" />
-      <input type="text"   id="origin"        placeholder="Origen" />
-      <input type="text"   id="destination"   placeholder="Destino" />
-      <input type="number" id="basePrice"     placeholder="Precio Base" step="0.01" />
-      <input type="number" id="passengers"    placeholder="Pasajeros" value="0" />
-      <input type="number" id="promotion"     placeholder="Promoción (0–1)" step="0.01" value="0" />
-      <input type="text"   id="alert"         placeholder="Alerta" />
-      <select id="priority">
-        <option value="1">1 - Baja</option>
-        <option value="2">2</option>
-        <option value="3" selected>3 - Media</option>
-        <option value="4">4</option>
-        <option value="5">5 - Alta</option>
-      </select>
-      <!-- Edit/Delete/Cancel require a node to be selected first -->
-      <button id="addFlightBtn">Agregar Vuelo</button>
-      <button id="editFlightBtn"   disabled>Editar Vuelo</button>
-      <button id="deleteFlightBtn" disabled>Eliminar Vuelo</button>
-      <button id="cancelFlightBtn" disabled>Cancelar Vuelo</button>
-    </div>
+      <!-- Detalle del nodo seleccionado -->
+      <div id="nodeDetail" class="hidden">
+        <div class="node-detail-header">
+          <span class="mono" id="nodeDetailCode">—</span>
+          <button class="btn-close-detail" onclick="document.getElementById('nodeDetail').classList.add('hidden')">✕</button>
+        </div>
+        <div id="nodeDetailContent"></div>
+      </div>
+    </section>
 
-    <!-- Node detail panel — appears after clicking a node in the tree -->
-    <div id="nodeDetail" class="hidden">
-      <h4>Detalle del Nodo Seleccionado</h4>
-      <div id="nodeDetailContent"></div>
-    </div>
-  </section>
+    <!-- MÉTRICAS ANALÍTICAS -->
+    <section class="card">
+      <h3 class="card-title">Métricas Analíticas</h3>
+      <div class="metrics-list">
+        <div class="metric-row"><span>Rotaciones LL</span><span class="mono" id="llRotations">0</span></div>
+        <div class="metric-row"><span>Rotaciones RR</span><span class="mono" id="rrRotations">0</span></div>
+        <div class="metric-row"><span>Rotaciones LR</span><span class="mono" id="lrRotations">0</span></div>
+        <div class="metric-row"><span>Rotaciones RL</span><span class="mono" id="rlRotations">0</span></div>
+        <div class="metric-row"><span>Total Rotaciones</span><span class="mono" id="rotationsValue">0</span></div>
+        <div class="metric-row"><span>Cancelaciones Masivas</span><span class="mono" id="massCancellations">0</span></div>
+      </div>
+      <div class="traversal-block">
+        <div class="traversal-row">
+          <span class="traversal-label">Anchura</span>
+          <span class="traversal-val mono" id="breadthTraversal">—</span>
+        </div>
+        <div class="traversal-row">
+          <span class="traversal-label">Profundidad</span>
+          <span class="traversal-val mono" id="depthTraversal">—</span>
+        </div>
+      </div>
+    </section>
 
-  <!-- Analytical metrics and traversal orders -->
-  <section id="metricsSection">
-    <h3>Métricas Analíticas</h3>
-    <div id="metrics">
-      <p><strong>Altura Actual:</strong>           <span id="currentHeight">0</span></p>
-      <p><strong>Rotaciones LL:</strong>           <span id="llRotations">0</span></p>
-      <p><strong>Rotaciones RR:</strong>           <span id="rrRotations">0</span></p>
-      <p><strong>Rotaciones LR:</strong>           <span id="lrRotations">0</span></p>
-      <p><strong>Rotaciones RL:</strong>           <span id="rlRotations">0</span></p>
-      <p><strong>Cancelaciones Masivas:</strong>   <span id="massCancellations">0</span></p>
-      <p><strong>Recorrido en Anchura:</strong>    <span id="breadthTraversal">-</span></p>
-      <p><strong>Recorrido en Profundidad:</strong><span id="depthTraversal">-</span></p>
-    </div>
-  </section>
+    <!-- PROFUNDIDAD CRÍTICA -->
+    <section class="card">
+      <h3 class="card-title">Profundidad Crítica</h3>
+      <p class="card-desc">Nodos más profundos reciben un recargo del 25% sobre el precio base.</p>
+      <div class="inline-form">
+        <input type="number" id="criticalDepth" value="5" min="1" />
+        <button id="updateCriticalDepthBtn" class="btn btn-red">Actualizar</button>
+      </div>
+    </section>
 
-  <!-- Critical depth penalisation system (spec §6) -->
-  <section id="penalizationSection">
-    <h3>Sistema de Penalización</h3>
-    <label for="criticalDepth">Profundidad Crítica:</label>
-    <input  type="number" id="criticalDepth" value="5" min="1" />
-    <button id="updateCriticalDepthBtn">Actualizar</button>
-  </section>
+    <!-- VERSIONES -->
+    <section class="card">
+      <h3 class="card-title">Versiones</h3>
+      <div class="inline-form">
+        <input type="text" id="versionName" placeholder="Nombre de la versión" />
+        <button id="saveVersionBtn" class="btn btn-blue">Guardar</button>
+        <button id="showVersionsBtn" class="btn btn-ghost">Ver todas</button>
+      </div>
+    </section>
 
-  <!-- Version management -->
-  <section id="versionsSection">
-    <h3>Gestión de Versiones</h3>
-    <div id="versionsControls">
-      <input type="text" id="versionName" placeholder="Nombre de la Versión" />
-      <button id="saveVersionBtn">Guardar Versión</button>
-      <button id="showVersionsBtn">Ver Versiones</button>
-    </div>
-  </section>
+    <!-- COLA DE CONCURRENCIA -->
+    <section class="card">
+      <h3 class="card-title">Cola de Concurrencia</h3>
 
-  <!-- Queue: concurrent insertion simulation (spec §3) -->
-<section id="queueSection">
-  <h3>Simulación de Concurrencia</h3>
+      <div id="queueForm">
+        <div class="field-group">
+          <label>Código</label>
+          <input type="text" id="qFlightCode" placeholder="Ej: LA202" maxlength="8" />
+        </div>
+        <div class="field-group">
+          <label>Origen</label>
+          <input type="text" id="qOrigin" placeholder="Ciudad origen" maxlength="30" />
+        </div>
+        <div class="field-group">
+          <label>Destino</label>
+          <input type="text" id="qDestination" placeholder="Ciudad destino" maxlength="30" />
+        </div>
+        <div class="field-group">
+          <label>Precio Base</label>
+          <input type="number" id="qBasePrice" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="field-group">
+          <label>Pasajeros</label>
+          <input type="number" id="qPassengers" placeholder="0" value="0" />
+        </div>
+        <div class="field-group">
+          <label>Promoción</label>
+          <input type="number" id="qPromotion" placeholder="0.00" step="0.01" min="0" max="1" value="0" />
+        </div>
+        <div class="field-group field-full">
+          <label>Alerta</label>
+          <select id="qAlert">
+            <option value="">Sin alerta</option>
+            <option value="Retraso">Retraso</option>
+            <option value="Cancelado">Cancelado</option>
+            <option value="Embarque">Embarque</option>
+            <option value="Sobreventa">Sobreventa</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+            <option value="Clima">Clima</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Prioridad</label>
+          <select id="qPriority">
+            <option value="1">1 — Baja</option>
+            <option value="2">2</option>
+            <option value="3" selected>3 — Media</option>
+            <option value="4">4</option>
+            <option value="5">5 — Alta</option>
+          </select>
+        </div>
+        <div class="field-full">
+          <button id="enqueueBtn" class="btn btn-green" style="width:100%">Encolar Vuelo</button>
+        </div>
+      </div>
 
-  <!-- Form to schedule a flight without inserting immediately -->
-  <div id="queueForm">
-    <input type="text"   id="qFlightCode"    placeholder="Código de Vuelo" />
-    <input type="text"   id="qOrigin"        placeholder="Origen" />
-    <input type="text"   id="qDestination"   placeholder="Destino" />
-    <input type="number" id="qBasePrice"     placeholder="Precio Base" step="0.01" />
-    <input type="number" id="qPassengers"    placeholder="Pasajeros" value="0" />
-    <input type="number" id="qPromotion"     placeholder="Promoción (0–1)" step="0.01" value="0" />
-    <input type="text"   id="qAlert"         placeholder="Alerta" />
-    <select id="qPriority">
-      <option value="1">1 - Baja</option>
-      <option value="2">2</option>
-      <option value="3" selected>3 - Media</option>
-      <option value="4">4</option>
-      <option value="5">5 - Alta</option>
-    </select>
-    <button id="enqueueBtn">Encolar Vuelo</button>
-  </div>
+      <div id="queueStatus">
+        <div class="stat"><span class="stat-label">Pendientes</span><span class="stat-value" id="qPending">0</span></div>
+        <div class="stat"><span class="stat-label">Procesados</span><span class="stat-value" id="qProcessed">0</span></div>
+        <div class="stat"><span class="stat-label">Conflictos</span><span class="stat-value" id="qConflicts">0</span></div>
+      </div>
 
-  <!-- Queue status and controls -->
-  <div id="queueStatus">
-    <p><strong>Pendientes:</strong> <span id="qPending">0</span></p>
-    <p><strong>Procesados:</strong> <span id="qProcessed">0</span></p>
-    <p><strong>Conflictos:</strong> <span id="qConflicts">0</span></p>
-  </div>
+      <div class="btn-row" style="margin-top:0.75rem">
+        <button id="processOneBtn" class="btn btn-blue">▶ Procesar siguiente</button>
+        <button id="processAllBtn" class="btn btn-green">⏩ Procesar todo</button>
+        <button id="clearQueueBtn" class="btn btn-red">🗑 Limpiar cola</button>
+      </div>
 
-  <div id="queueActions">
-    <button id="processOneBtn">▶ Procesar Siguiente</button>
-    <button id="processAllBtn">⏩ Procesar Todo</button>
-    <button id="clearQueueBtn">🗑 Limpiar Cola</button>
-  </div>
+      <div id="queueList" style="margin-top:0.75rem">
+        <p class="subsection-label">En cola</p>
+        <ul id="pendingList"><li class="empty-item">Cola vacía</li></ul>
+      </div>
 
-  <!-- Pending flights list -->
-  <div id="queueList">
-    <h4>Vuelos en Cola</h4>
-    <ul id="pendingList"><li class="empty-queue">Cola vacía</li></ul>
-  </div>
+      <div id="conflictLog" class="hidden" style="margin-top:0.5rem">
+        <p class="subsection-label conflict-label">⚠ Conflictos</p>
+        <ul id="conflictList"></ul>
+      </div>
+    </section>
 
-  <!-- Conflict log -->
-  <div id="conflictLog" class="hidden">
-    <h4>⚠ Conflictos Detectados</h4>
-    <ul id="conflictList"></ul>
-  </div>
-</section>
+  </main>
+</div>
 
-</main>
-
-<!-- ======= TOAST NOTIFICATION ======= -->
+<!-- ======= TOAST ======= -->
 <div id="toast" class="toast"></div>
 
 <!-- ======= MODALS ======= -->
-
-<!-- Modal: load JSON file -->
 <div id="jsonModal" class="modal">
   <div class="modal-content">
-    <span class="close" data-close="jsonModal">&times;</span>
+    <button class="modal-close" data-close="jsonModal">✕</button>
     <h3>Cargar Archivo JSON</h3>
-    <label>Tipo de reconstrucción:
+    <div class="field-group">
+      <label>Modo de reconstrucción</label>
       <select id="loadType">
         <option value="topology">Topología</option>
         <option value="insertion">Inserción</option>
       </select>
-    </label>
+    </div>
     <label class="file-upload-label">
       <span id="fileLabel">📂 Seleccionar archivo .json</span>
       <input type="file" id="jsonFile" accept=".json" />
     </label>
-    <button id="loadJsonConfirmBtn">Cargar</button>
+    <button id="loadJsonConfirmBtn" class="btn btn-blue" style="width:100%">Cargar</button>
   </div>
 </div>
 
-<!-- Modal: saved versions list -->
 <div id="versionsModal" class="modal">
   <div class="modal-content">
-    <span class="close" data-close="versionsModal">&times;</span>
+    <button class="modal-close" data-close="versionsModal">✕</button>
     <h3>Versiones Guardadas</h3>
     <ul id="versionsList"></ul>
   </div>
 </div>
 
-<!-- Modal: AVL audit report
-     The audit button is hidden by default and only shown during stress mode (spec §7) -->
 <div id="auditModal" class="modal">
   <div class="modal-content">
-    <span class="close" data-close="auditModal">&times;</span>
+    <button class="modal-close" data-close="auditModal">✕</button>
     <h3>Reporte de Auditoría AVL</h3>
     <div id="auditReport"></div>
   </div>
 </div>
 
-<!-- D3.js must be loaded before script.js -->
 <script src="https://d3js.org/d3.v7.min.js"></script>
-<!-- Application logic (src/negocio/script.js) -->
 <script type="module" src="/negocio/script.js"></script>
-
 </body>
 </html>

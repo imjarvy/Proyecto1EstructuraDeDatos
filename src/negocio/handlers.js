@@ -3,21 +3,6 @@
 //  Responsibility: register UI event listeners and orchestrate frontend flows.
 // =============================================================================
 
-/**
- * Register all UI event listeners for CRUD, stress mode, audit, and versioning.
- *
- * @param {Object} deps - Dependencies injected from the app coordinator.
- * @param {Object} deps.state - Shared frontend state.
- * @param {Function} deps.api - HTTP helper for backend requests.
- * @param {Function} deps.showToast - Toast notifier utility.
- * @param {Function} deps.openModal - Opens a modal by id.
- * @param {Function} deps.closeModal - Closes a modal by id.
- * @param {Function} deps.updatePanels - Refreshes AVL panels and tree rendering.
- * @param {Function} deps.updateBstPanel - Refreshes BST comparison panel.
- * @param {Function} deps.clearForm - Clears CRUD form and selection.
- * @param {Function} deps.getFormPayload - Builds validated form payload.
- * @returns {void}
- */
 export function registerHandlers({
   state,
   api,
@@ -56,7 +41,7 @@ export function registerHandlers({
       if (data.bst_tree) updateBstPanel(data.bst_tree);
 
       closeModal("jsonModal");
-      showToast("Arbol cargado correctamente", "success");
+      showToast("Árbol cargado correctamente", "success");
     } catch (error) {
       showToast(error.message, "error");
     }
@@ -65,7 +50,7 @@ export function registerHandlers({
   document.getElementById("exportTreeBtn").addEventListener("click", async () => {
     try {
       const data = await api("/api/export-tree");
-      showToast(data.message || "Arbol exportado en Descargas", "success");
+      showToast(data.message || "Árbol exportado en Descargas", "success");
     } catch (_) {}
   });
 
@@ -139,7 +124,7 @@ export function registerHandlers({
     try {
       const data = await api("/api/undo", "POST");
       updatePanels(data.tree);
-      showToast("Accion deshecha", "info");
+      showToast("Acción deshecha", "info");
     } catch (_) {}
   });
 
@@ -156,42 +141,34 @@ export function registerHandlers({
       const auditButton = document.getElementById("auditAvlBtn");
 
       if (state.stressMode) {
-        button.textContent = "Desactivar Modo Estres";
+        button.textContent = "Desactivar Estrés";
         button.classList.add("active-stress");
         banner.classList.remove("hidden");
         auditButton.style.display = "inline-block";
-        document.body.classList.add("stress-active");    // full-page red theme
-        showToast("Modo Estres activado", "warn");
+        document.body.classList.add("stress-active");
+        showToast("Modo Estrés activado", "warn");
       } else {
-        button.textContent = "Activar Modo Estres";
+        button.textContent = "Modo Estrés";
         button.classList.remove("active-stress");
         banner.classList.add("hidden");
         auditButton.style.display = "none";
-        document.body.classList.remove("stress-active"); // restore normal theme
-        showToast(`Modo normal restaurado - ${data.rotations_done} rotaciones aplicadas`, "success");
+        document.body.classList.remove("stress-active");
+        showToast(`Modo normal restaurado — ${data.rotations_done} rotaciones aplicadas`, "success");
       }
-    } catch (_) {}
-  });
-
-  document.getElementById("globalRebalanceBtn").addEventListener("click", async () => {
-    try {
-      const data = await api("/api/global-rebalance", "POST");
-      updatePanels(data.tree);
-      showToast(`Rebalanceo global completado - ${data.rotations_done} rotaciones`, "success");
     } catch (_) {}
   });
 
   document.getElementById("updateCriticalDepthBtn").addEventListener("click", async () => {
     const value = parseInt(document.getElementById("criticalDepth").value, 10);
     if (Number.isNaN(value) || value < 1) {
-      showToast("Profundidad invalida", "error");
+      showToast("Profundidad inválida", "error");
       return;
     }
 
     try {
       const data = await api("/api/update-critical-depth", "POST", { critical_depth: value });
       updatePanels(data.tree);
-      showToast(`Profundidad critica actualizada a ${value}`, "success");
+      showToast(`Profundidad crítica → ${value}`, "success");
     } catch (_) {}
   });
 
@@ -211,7 +188,7 @@ export function registerHandlers({
       const report = document.getElementById("auditReport");
 
       if (data.valid) {
-        report.innerHTML = "<p class='audit-ok'>El arbol cumple la propiedad AVL en todos los nodos.</p>";
+        report.innerHTML = "<p class='audit-ok'>El árbol cumple la propiedad AVL en todos los nodos.</p>";
       } else {
         const rows = data.report.map(item => `
           <div class="audit-node">
@@ -230,14 +207,14 @@ export function registerHandlers({
   document.getElementById("saveVersionBtn").addEventListener("click", async () => {
     const name = document.getElementById("versionName").value.trim();
     if (!name) {
-      showToast("Escribe un nombre de version", "error");
+      showToast("Escribe un nombre de versión", "error");
       return;
     }
 
     try {
       await api("/api/save-version", "POST", { version_name: name });
       document.getElementById("versionName").value = "";
-      showToast(`Version \"${name}\" guardada`, "success");
+      showToast(`Versión "${name}" guardada`, "success");
     } catch (_) {}
   });
 
@@ -246,11 +223,6 @@ export function registerHandlers({
     openModal("versionsModal");
   });
 
-  /**
-   * Fetch saved versions and render the modal list with restore/delete actions.
-   *
-   * @returns {Promise<void>}
-   */
   async function refreshVersionsList() {
     try {
       const data = await api("/api/list-versions");
@@ -267,7 +239,7 @@ export function registerHandlers({
           <div class="version-info">
             <strong>${name}</strong>
             <small>${new Date(meta.timestamp).toLocaleString("es-CO")}</small>
-            <small>${meta.tree_size ?? "?"} nodos - altura ${meta.tree_height ?? "?"}</small>
+            <small>${meta.tree_size ?? "?"} nodos · altura ${meta.tree_height ?? "?"}</small>
           </div>
           <div class="version-actions">
             <button class="btn-restore" data-name="${name}">Restaurar</button>
@@ -282,7 +254,7 @@ export function registerHandlers({
             const data = await api("/api/restore-version", "POST", { version_name: versionName });
             updatePanels(data.tree);
             closeModal("versionsModal");
-            showToast(`Version \"${versionName}\" restaurada`, "success");
+            showToast(`Versión "${versionName}" restaurada`, "success");
           } catch (_) {}
         });
       });
@@ -290,11 +262,11 @@ export function registerHandlers({
       list.querySelectorAll(".btn-del-ver").forEach(button => {
         button.addEventListener("click", async () => {
           const versionName = button.dataset.name;
-          if (!confirm(`¿Eliminar la version \"${versionName}\"?`)) return;
+          if (!confirm(`¿Eliminar la versión "${versionName}"?`)) return;
 
           try {
             await api("/api/delete-version", "POST", { version_name: versionName });
-            showToast(`Version \"${versionName}\" eliminada`, "info");
+            showToast(`Versión "${versionName}" eliminada`, "info");
             await refreshVersionsList();
           } catch (_) {}
         });
