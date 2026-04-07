@@ -33,21 +33,10 @@ class FlightQueue:
 
     # ================ENQUEUE / DEQUEUE=======================
     def enqueue(self, flight_node: FlightNode) -> None:
-        """
-        Add a flight to the end of the queue.
-
-        Args:
-            flight_node (FlightNode): Flight to enqueue.
-        """
         self._queue.append(flight_node)
 
     def dequeue(self) -> Optional[FlightNode]:
-        """
-        Remove and return the next pending flight.
-
-        Returns:
-            Optional[FlightNode]: First queued flight, or None when empty.
-        """
+    
         if self.is_empty():
             return None
         return self._queue.pop(0)
@@ -94,10 +83,6 @@ class FlightQueue:
     def register_conflict(self, flight_node: FlightNode, reason: str) -> None:
         """
         Register a flight that caused a processing conflict.
-
-        Args:
-            flight_node (FlightNode): Flight related to the conflict.
-            reason (str): Human-readable reason for the conflict.
         """
 
         self._conflicts.append({

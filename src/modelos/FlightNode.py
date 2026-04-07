@@ -13,12 +13,7 @@ class FlightNode:
     Represents a flight node in the AVL tree structure.
     
     Attributes:
-        flight_code (str): Unique identifier for the flight.
-        origin (str): Departure city.
-        destination (str): Arrival city.
-        base_price (float): Initial ticket price.
-        final_price (float): Current ticket price after adjustments.
-        passengers (int): Current passenger count.
+        we have many attributes, they are in the constructor, the next ones its just for remember the complex ones for me:
         promotion (float): Active promotion discount (0 if none).
         alert (str): Alert status for this flight (empty if none).
         priority (int): Flight priority level (1-5, where 5 is highest).

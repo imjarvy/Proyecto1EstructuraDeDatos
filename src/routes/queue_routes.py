@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request
 from src.modelos.FlightNode import FlightNode
 from src.modelos.FlightQueue import FlightQueue
-from src.controllers.QueueController import QueueController
+from src.negocio.QueueController import QueueController
 
 queue_bp = Blueprint("queue", __name__)  # Blueprint = mini-app Flask independiente
 
