@@ -75,6 +75,7 @@ function initializeApp() {
     closeModal,
     updatePanels: treeUi.updatePanels,
     updateBstPanel: treeUi.updateBstPanel,
+    clearBstPanel: treeUi.clearBstPanel,
     clearForm: treeUi.clearForm,
     getFormPayload: treeUi.getFormPayload,
   });

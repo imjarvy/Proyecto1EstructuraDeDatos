@@ -173,6 +173,18 @@ export function createTreeUi({ state, showToast }) {
   }
 
   /**
+   * Clear BST comparison panel: hide section and clear SVG.
+   * Called when loading a mode that doesn't have BST data.
+   *
+   * @returns {void}
+   */
+  function clearBstPanel() {
+    document.getElementById("bstSection").classList.add("hidden");
+    const bstSvg = d3Api.select("#bstSvg");
+    bstSvg.selectAll("*").remove();
+  }
+
+  /**
    * Handle node selection from the tree and synchronize form/detail panels.
    *
    * @param {Object} nodeData - Selected flight node payload.
@@ -263,6 +275,7 @@ export function createTreeUi({ state, showToast }) {
     renderTree,
     updatePanels,
     updateBstPanel,
+    clearBstPanel,
     selectNode,
     clearForm,
     getFormPayload,

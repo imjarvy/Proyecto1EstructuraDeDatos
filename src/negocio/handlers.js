@@ -11,6 +11,7 @@ export function registerHandlers({
   closeModal,
   updatePanels,
   updateBstPanel,
+  clearBstPanel,
   clearForm,
   getFormPayload,
 }) {
@@ -38,7 +39,11 @@ export function registerHandlers({
       if (!response.ok) throw new Error(data.error);
 
       updatePanels(data.tree);
-      if (data.bst_tree) updateBstPanel(data.bst_tree);
+      if (data.bst_tree) {
+        updateBstPanel(data.bst_tree);
+      } else {
+        clearBstPanel();
+      }
 
       closeModal("jsonModal");
       showToast("Árbol cargado correctamente", "success");
@@ -61,6 +66,7 @@ export function registerHandlers({
     try {
       const data = await api("/api/add-flight", "POST", payload);
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       clearForm();
       showToast(`Vuelo ${payload.flight_code} agregado`, "success");
     } catch (_) {}
@@ -102,6 +108,7 @@ export function registerHandlers({
       const data = await api("/api/delete-flight", "POST", { flight_code: state.selectedCode });
       const deletedCode = state.selectedCode;
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       clearForm();
       showToast(`Vuelo ${deletedCode} eliminado`, "info");
     } catch (_) {}
@@ -115,6 +122,7 @@ export function registerHandlers({
       const data = await api("/api/cancel-flight", "POST", { flight_code: state.selectedCode });
       const cancelledCode = state.selectedCode;
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       clearForm();
       showToast(`Vuelo ${cancelledCode} cancelado (${data.removed_count} nodos eliminados)`, "warn");
     } catch (_) {}
@@ -124,6 +132,7 @@ export function registerHandlers({
     try {
       const data = await api("/api/undo", "POST");
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       showToast("Acción deshecha", "info");
     } catch (_) {}
   });
@@ -135,6 +144,7 @@ export function registerHandlers({
       const data = await api("/api/toggle-stress-mode", "POST", { stress_mode: nextState });
       state.stressMode = data.stress_mode;
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
 
       const button = document.getElementById("stressModeBtn");
       const banner = document.getElementById("stressBanner");
@@ -168,6 +178,7 @@ export function registerHandlers({
     try {
       const data = await api("/api/update-critical-depth", "POST", { critical_depth: value });
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       showToast(`Profundidad crítica → ${value}`, "success");
     } catch (_) {}
   });
@@ -178,6 +189,7 @@ export function registerHandlers({
     try {
       const data = await api("/api/delete-least-profitable", "POST");
       updatePanels(data.tree);
+      if (!data.bst_tree) clearBstPanel();
       showToast(`Vuelo ${data.cancelled} (menor rentabilidad) eliminado`, "warn");
     } catch (_) {}
   });

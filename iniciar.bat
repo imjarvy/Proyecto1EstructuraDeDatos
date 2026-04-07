@@ -27,17 +27,25 @@ if errorlevel 1 (
 echo  [2/3] Iniciando servidor Flask en http://localhost:5000 ...
 echo.
 
-REM Arrancar Flask en segundo plano y abrir navegador
-start "SkyBalance AVL - Servidor" cmd /k "cd /d ""%~dp0"" && py app.py"
+REM Arrancar Flask en un nuevo CMD
+start "SkyBalance AVL - Servidor" cmd /k "chcp 65001 >nul && cd /d ""%~dp0"" && py app.py"
 
-REM Esperar 2 segundos a que Flask levante
-timeout /t 2 /nobreak >nul
+REM Esperar 3 segundos a que Flask levante completamente
+timeout /t 3 /nobreak >nul
 
 echo  [3/3] Abriendo navegador...
-start "" http://localhost:5000
+REM Abrir en Chrome/Edge si está disponible, sino en navegador predeterminado
+where chrome >nul 2>&1 && (
+    start chrome http://localhost:5000
+) || where msedge >nul 2>&1 && (
+    start msedge http://localhost:5000
+) || (
+    start http://localhost:5000
+)
 
 echo.
-echo  Servidor corriendo en http://localhost:5000
-echo  Cierra la ventana "SkyBalance AVL - Servidor" para detener la aplicacion.
+echo  ✓ Servidor corriendo en http://localhost:5000
+echo  ✓ Si el navegador no abre, ve a http://localhost:5000 manualmente
+echo  ✓ Cierra la ventana "SkyBalance AVL - Servidor" para detener
 echo.
 pause
