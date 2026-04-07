@@ -35,13 +35,13 @@ app.register_blueprint(queue_bp)
 # Instancia global del árbol (será sincronizado con manager)
 avl_tree = AVLTree()
 
-# Route to serve static JS files from src/negocio/
-NEGOCIO_DIR = os.path.join(os.path.dirname(__file__), "src", "negocio")
+# Route to serve static JS files from src/presentacion/scripts/
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "src", "presentacion", "scripts")
 
-@app.route("/negocio/<path:filename>")
-def negocio_static(filename):
-    """Serve static JS files from the negocio directory."""
-    return send_from_directory(NEGOCIO_DIR, filename)
+@app.route("/scripts/<path:filename>")
+def scripts_static(filename):
+    """Serve static JS files from the presentation scripts directory."""
+    return send_from_directory(SCRIPTS_DIR, filename)
 
 
 # ===========================================================================
