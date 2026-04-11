@@ -14,7 +14,6 @@ from src.acceso_datos.DataLoader import DataLoader
 from src.acceso_datos.DataPersistence import DataPersistence
 from src.acceso_datos.VersionManager import VersionManager
 
-
 class DataStorage:
     """
     Central data management system for SkyBalance AVL.
@@ -50,7 +49,7 @@ class DataStorage:
         rebalance_after_load: bool = True,
     ) -> Tuple[Optional[AVLTree], Optional[BST], Optional[str]]:
         """
-        Complete workflow: Load JSON from file, validate structure, and reconstruct trees.
+        Load JSON from file, validate structure, and reconstruct trees.
         
         Args:
             uploaded_file: Flask FileStorage-like object.
@@ -113,6 +112,18 @@ class DataStorage:
         """
         return self.persistence.serialize_tree_for_storage(root)
 
+    def deserialize_tree_data(self, data: Dict) -> Optional[FlightNode]:
+        """
+        Deserialize tree data without mutating current storage state.
+
+        Args:
+            data (Dict): Serialized tree data.
+
+        Returns:
+            FlightNode: Root node of reconstructed tree, or None if failed.
+        """
+        return self.persistence.deserialize_tree_from_dict(data)
+    
     def export_tree(
         self,
         root: Optional[FlightNode] = None,
@@ -134,18 +145,6 @@ class DataStorage:
             return False, "No se pudo exportar el árbol a archivo"
 
         return True, None
-
-    def deserialize_tree_data(self, data: Dict) -> Optional[FlightNode]:
-        """
-        Deserialize tree data without mutating current storage state.
-
-        Args:
-            data (Dict): Serialized tree data.
-
-        Returns:
-            FlightNode: Root node of reconstructed tree, or None if failed.
-        """
-        return self.persistence.deserialize_tree_from_dict(data)
     
     # ============================================================================
     # METADATA OPERATIONS
@@ -256,7 +255,7 @@ class DataStorage:
         return self.version_manager.get_all_versions_info()
     
     # ============================================================================
-    # IN-MEMORY RECONSTRUCTION (web / dict-based API)
+    # IN-MEMORY RECONSTRUCTION OPERATIONS
     # ============================================================================
 
     def reconstruct_avl_from_dict(self, data: Dict) -> Optional[AVLTree]:

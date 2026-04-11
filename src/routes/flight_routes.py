@@ -1,3 +1,10 @@
+"""
+Flight routes module for SkyBalance AVL Flight Management System.
+
+Provides Flask endpoints for tree operations including CRUD operations,
+tree analysis, version management, and tree visualization.
+"""
+
 from flask import Blueprint, jsonify, request
 
 from src.modelos.AVLTree import AVLTree
@@ -12,6 +19,16 @@ _critical_depth = 5
 
 
 def init_flight_routes(manager, bst_tree, data_storage, analysis, critical_depth=5):
+    """
+    Initialize flight routes with required instances.
+    
+    Args:
+        manager: AVLTreeManager instance for tree operations.
+        bst_tree: BST tree instance for comparison visualization.
+        data_storage: DataStorage instance for persistence.
+        analysis: TreeAnalysisManager instance for analysis operations.
+        critical_depth (int): Initial critical depth value for pricing penalty.
+    """
     global _manager, _bst_tree, _data_storage, _analysis, _critical_depth
     _manager = manager
     _bst_tree = bst_tree
@@ -21,6 +38,16 @@ def init_flight_routes(manager, bst_tree, data_storage, analysis, critical_depth
 
 
 def _node_to_dict(node, depth: int = 0):
+    """
+    Convert AVL tree node to dictionary representation with depth info.
+    
+    Args:
+        node: FlightNode to convert (None renders as None).
+        depth (int): Current depth in tree (default: 0 at root).
+    
+    Returns:
+        dict: Node data including flight info, depth, critical status, and children.
+    """
     if node is None:
         return None
     data = node.to_dict()
@@ -32,6 +59,16 @@ def _node_to_dict(node, depth: int = 0):
 
 
 def _bst_node_to_dict(node, depth: int = 0):
+    """
+    Convert BST tree node to dictionary representation with depth info.
+    
+    Args:
+        node: FlightNode to convert (None renders as None).
+        depth (int): Current depth in tree (default: 0 at root).
+    
+    Returns:
+        dict: Node data including flight info, depth, and children.
+    """
     if node is None:
         return None
     data = node.to_dict()
@@ -42,6 +79,12 @@ def _bst_node_to_dict(node, depth: int = 0):
 
 
 def _tree_payload() -> dict:
+    """
+    Generate complete payload for AVL tree state.
+    
+    Returns:
+        dict: Tree structure, metrics, metadata, and traversal orders.
+    """
     tree = _manager.tree
     metadata = _data_storage.get_tree_metadata(tree.root)
 
@@ -74,6 +117,12 @@ def _tree_payload() -> dict:
 
 
 def _bst_payload() -> dict:
+    """
+    Generate complete payload for BST tree state.
+    
+    Returns:
+        dict: BST structure and metadata.
+    """
     if _bst_tree.root is None:
         return {"root": None, "height": 0, "node_count": 0, "leaf_count": 0}
     properties = _bst_tree.get_properties()
@@ -87,11 +136,27 @@ def _bst_payload() -> dict:
 
 @flight_bp.route("/api/tree-state", methods=["GET"])
 def tree_state():
+    """
+    Get current AVL tree state.
+    
+    Returns:
+        JSON: Complete tree structure and metadata.
+    """
     return jsonify({"tree": _tree_payload()})
 
 
 @flight_bp.route("/api/load-tree", methods=["POST"])
 def load_tree():
+    """
+    Load and reconstruct tree from JSON file.
+    
+    Expected form fields:
+        - file: Uploaded JSON file (required)
+        - type: Load type "topology" or "insertion" (default: "topology")
+    
+    Returns:
+        JSON: Reconstructed tree state or error message.
+    """
     global _manager, _bst_tree
 
     file = request.files.get("file")
@@ -120,6 +185,12 @@ def load_tree():
 
 @flight_bp.route("/api/export-tree", methods=["GET"])
 def export_tree():
+    """
+    Export current AVL tree to JSON file in Downloads folder.
+    
+    Returns:
+        JSON: Success message or error.
+    """
     success, error = _data_storage.export_tree(_manager.tree.root)
     if error:
         status = 400 if "vacío" in error else 500
@@ -133,6 +204,22 @@ def export_tree():
 
 @flight_bp.route("/api/add-flight", methods=["POST"])
 def add_flight():
+    """
+    Add a new flight to the AVL tree.
+    
+    Expected JSON fields:
+        - flight_code (str): Unique flight identifier (required)
+        - origin (str): Departure city (required)
+        - destination (str): Arrival city (required)
+        - base_price (float): Base ticket price >= 0 (required)
+        - passengers (int): Passenger count >= 0 (optional, default: 0)
+        - promotion (float): Discount 0.0-1.0 (optional, default: 0.0)
+        - alert (str): Alert message (optional, default: "")
+        - priority (int): Priority 1-5 (optional, default: 3)
+    
+    Returns:
+        JSON: Updated tree state or validation error.
+    """
     data = request.get_json(silent=True) or {}
 
     missing = [field for field in ("flight_code", "origin", "destination", "base_price") if not data.get(field)]
@@ -174,6 +261,25 @@ def add_flight():
 
 @flight_bp.route("/api/edit-flight", methods=["POST"])
 def edit_flight():
+    """
+    Update flight fields by code.
+    
+    Expected JSON fields:
+        - flight_code (str): Code of flight to update (required)
+        - updated_data (dict): Fields to update:
+            - new_flight_code (str): Rename the flight
+            - origin (str): Update origin
+            - destination (str): Update destination
+            - base_price (float): Update price
+            - final_price (float): Override final price
+            - passengers (int): Update passenger count
+            - promotion (float): Update promotion
+            - alert (str): Update alert message
+            - priority (int): Update priority
+    
+    Returns:
+        JSON: Updated tree state or validation error.
+    """
     body = request.get_json(silent=True) or {}
     flight_code = body.get("flight_code", "").strip()
     updated_data = body.get("updated_data", {})
@@ -214,6 +320,15 @@ def edit_flight():
 
 @flight_bp.route("/api/delete-flight", methods=["POST"])
 def delete_flight():
+    """
+    Delete a single flight from the tree by code.
+    
+    Expected JSON fields:
+        - flight_code (str): Code of flight to delete
+    
+    Returns:
+        JSON: Updated tree state or error.
+    """
     body = request.get_json(silent=True) or {}
     flight_code = body.get("flight_code", "").strip()
     if not flight_code:
@@ -229,6 +344,15 @@ def delete_flight():
 
 @flight_bp.route("/api/cancel-flight", methods=["POST"])
 def cancel_flight():
+    """
+    Cancel a flight and remove its entire subtree.
+    
+    Expected JSON fields:
+        - flight_code (str): Code of flight to cancel
+    
+    Returns:
+        JSON: Removed count and updated tree state or error.
+    """
     body = request.get_json(silent=True) or {}
     flight_code = body.get("flight_code", "").strip()
     if not flight_code:
@@ -245,6 +369,12 @@ def cancel_flight():
 
 @flight_bp.route("/api/undo", methods=["POST"])
 def undo():
+    """
+    Undo the last mutating operation (Ctrl+Z).
+    
+    Returns:
+        JSON: Restored tree state or error if no undo history.
+    """
     ok = _manager.undo_last_action()
     if not ok:
         return jsonify({"error": "No hay acciones para deshacer"}), 400
@@ -253,6 +383,17 @@ def undo():
 
 @flight_bp.route("/api/toggle-stress-mode", methods=["POST"])
 def toggle_stress_mode():
+    """
+    Toggle stress mode for the AVL tree.
+    
+    In stress mode, rotations are deferred until global_rebalance is called.
+    
+    Expected JSON fields:
+        - stress_mode (bool): Target stress mode state
+    
+    Returns:
+        JSON: New stress mode state, rotations executed, and tree state.
+    """
     body = request.get_json(silent=True) or {}
     new_state = bool(body.get("stress_mode", not _manager.tree.stress_mode))
 
@@ -272,12 +413,26 @@ def toggle_stress_mode():
 
 @flight_bp.route("/api/global-rebalance", methods=["POST"])
 def global_rebalance():
+    """
+    Perform a complete tree rebalance.
+    
+    Returns:
+        JSON: Number of rotations performed and updated tree state.
+    """
     rotations = _manager.global_rebalance()
     return jsonify({"rotations_done": rotations, "tree": _tree_payload()})
 
 
 @flight_bp.route("/api/audit-avl", methods=["GET"])
 def audit_avl():
+    """
+    Audit the AVL tree for structural integrity.
+    
+    Verifies balance factors and height consistency.
+    
+    Returns:
+        JSON: Audit result (valid yes/no) and detailed issue report.
+    """
     report = []
     is_valid = _analysis.audit_node(_manager.tree.root, report)
     return jsonify({"valid": is_valid, "report": report})
@@ -285,6 +440,15 @@ def audit_avl():
 
 @flight_bp.route("/api/update-critical-depth", methods=["POST"])
 def update_critical_depth():
+    """
+    Update the critical depth threshold and apply pricing penalties.
+    
+    Expected JSON fields:
+        - critical_depth (int): New depth threshold (must be >= 1)
+    
+    Returns:
+        JSON: New critical depth value and updated tree state or error.
+    """
     global _critical_depth
     body = request.get_json(silent=True) or {}
 
@@ -302,6 +466,15 @@ def update_critical_depth():
 
 @flight_bp.route("/api/save-version", methods=["POST"])
 def save_version():
+    """
+    Save current tree state as a named version.
+    
+    Expected JSON fields:
+        - version_name (str): Descriptive name for this version (required)
+    
+    Returns:
+        JSON: Success flag.
+    """
     body = request.get_json(silent=True) or {}
     version_name = body.get("version_name", "").strip()
     if not version_name:
@@ -319,6 +492,15 @@ def save_version():
 
 @flight_bp.route("/api/restore-version", methods=["POST"])
 def restore_version():
+    """
+    Restore tree state from a saved version.
+    
+    Expected JSON fields:
+        - version_name (str): Name of version to restore (required)
+    
+    Returns:
+        JSON: Updated tree state or error if version not found.
+    """
     global _manager
     body = request.get_json(silent=True) or {}
     version_name = body.get("version_name", "").strip()
@@ -347,11 +529,26 @@ def restore_version():
 
 @flight_bp.route("/api/list-versions", methods=["GET"])
 def list_versions():
+    """
+    Get information about all saved versions.
+    
+    Returns:
+        JSON: Dictionary mapping version names to their metadata.
+    """
     return jsonify({"versions": _data_storage.get_all_versions_info()})
 
 
 @flight_bp.route("/api/delete-version", methods=["POST"])
 def delete_version():
+    """
+    Delete a saved version.
+    
+    Expected JSON fields:
+        - version_name (str): Name of version to delete
+    
+    Returns:
+        JSON: Success flag.
+    """
     body = request.get_json(silent=True) or {}
     version_name = body.get("version_name", "").strip()
     ok = _data_storage.delete_version(version_name)
@@ -360,6 +557,15 @@ def delete_version():
 
 @flight_bp.route("/api/delete-least-profitable", methods=["POST"])
 def delete_least_profitable():
+    """
+    Find and cancel the least profitable flight in the tree.
+    
+    Applies profitability tiebreaker rules to identify the target flight,
+    then cancels it and removes its entire subtree.
+    
+    Returns:
+        JSON: Cancelled flight code, removed count, and updated tree state.
+    """
     if _manager.tree.root is None:
         return jsonify({"error": "El árbol está vacío"}), 400
 

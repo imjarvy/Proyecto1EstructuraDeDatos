@@ -10,7 +10,6 @@ import os
 from typing import Optional, Dict, Any
 from src.modelos.FlightNode import FlightNode
 
-
 class DataPersistence:
     """
     Handles serialization and persistence of tree structures to JSON format.
@@ -21,7 +20,7 @@ class DataPersistence:
     
     def __init__(self):
         """Initialize the DataPersistence module."""
-        self.last_export_path = None
+        pass
     
     def export_tree_to_json(self, root: Optional[FlightNode], file_path: str) -> bool:
         """
@@ -38,28 +37,27 @@ class DataPersistence:
             bool: True if export successful, False otherwise.
         """
         if not root:
-            print("Error: Root node is None. Cannot export empty tree.")
+            print("Error: la raíz es None. No se puede exportar un árbol vacío.")
             return False
         
         try:
             export_data = self.serialize_tree_for_storage(root)
             if export_data is None:
-                print("Error: Could not serialize tree for export.")
+                print("Error: No se pudo serializar el árbol para la exportación.")
                 return False
             
             # Write to file
             with open(file_path, 'w', encoding='utf-8') as file:
                 json.dump(export_data, file, indent=2, ensure_ascii=False)
             
-            self.last_export_path = file_path
-            print(f"Successfully exported tree to: {file_path}")
+            print(f"Árbol exportado exitosamente a: {file_path}")
             return True
         
         except IOError as e:
-            print(f"Error writing to file: {e}")
+            print(f"Error al escribir en el archivo: {e}")
             return False
         except Exception as e:
-            print(f"Unexpected error during export: {e}")
+            print(f"Error inesperado durante la exportación: {e}")
             return False
 
     def export_tree_to_downloads(
@@ -147,14 +145,14 @@ class DataPersistence:
             FlightNode: Root node of reconstructed tree, or None if failed.
         """
         if not data or "tree_structure" not in data:
-            print("Error: Invalid serialized data format.")
+            print("Error: formato de datos serializados inválido.")
             return None
         
         tree_structure = data["tree_structure"]
         root_code = data.get("root_code")
         
         if not root_code:
-            print("Error: No root code specified.")
+            print("Error: código de raíz no especificado.")
             return None
         
         # Rebuild nodes

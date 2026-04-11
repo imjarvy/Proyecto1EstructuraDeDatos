@@ -1,17 +1,32 @@
 """
 TreeAnalysisManager for tree audit, depth penalties, and profitability analysis.
+
+This module provides analysis utilities for AVL tree validation and business logic
+operations, including audit verification, pricing adjustments, and profitability calculations.
 """
 
-
 class TreeAnalysisManager:
-    """Encapsulates analysis and pricing-related tree operations."""
+    """
+    Provides analysis and pricing-related tree operations for SkyBalance.
+    
+    Encapsulates logic for:
+    - Auditing AVL tree structure and invariants
+    - Applying depth-based pricing penalties
+    - Computing and analyzing flight profitability
+    - Finding nodes by profitability criteria
+    """
 
     def apply_depth_penalties(self, node, depth: int, limit: int) -> None:
         """
         Apply critical-depth pricing rule recursively.
 
-        Nodes deeper than limit receive a 25% surcharge over base_price.
-        Nodes at or above the limit are reset to base_price.
+        Nodes deeper than the specified limit receive a 25% surcharge over base_price.
+        Nodes at or above the limit have their final_price reset based on promotion.
+
+        Args:
+            node: Current node being processed (None to stop recursion).
+            depth (int): Current depth in tree (0 at root).
+            limit (int): Critical depth threshold beyond which surcharge applies.
         """
         if node is None:
             return
@@ -26,11 +41,19 @@ class TreeAnalysisManager:
 
     def audit_node(self, node, report: list, depth: int = 0) -> bool:
         """
-        Verify AVL invariants recursively.
+        Verify AVL tree invariants recursively.
 
-        Checks:
-            - balance_factor in {-1, 0, 1}
-            - stored height equals computed height
+        Validates:
+            - balance_factor is in {-1, 0, 1} for AVL property.
+            - stored height equals computed height based on children.
+        
+        Args:
+            node: Current node being audited (None means valid empty subtree).
+            report (list): Accumulator list for found issues.
+            depth (int): Current depth in tree for issue tracking (default: 0).
+        
+        Returns:
+            bool: True if node and all descendants pass validation, False otherwise.
         """
         if node is None:
             return True
@@ -63,17 +86,32 @@ class TreeAnalysisManager:
         """
         Compute node profitability.
 
-        Promotion is already reflected in final_price by the manager.
+        Profitability = passengers × final_price.
+        Note: promotion is already reflected in final_price by the manager.
+
+        Args:
+            node: Flight node to calculate profitability for.
+        
+        Returns:
+            float: Profitability value (passengers × final_price).
         """
         return node.passengers * node.final_price
 
     def find_least_profitable(self, node, depth: int = 0):
         """
-        Find node with lowest profitability.
+        Find node with lowest profitability in tree.
 
-        Tie-breakers:
-            1. Greater depth first.
-            2. Larger flight_code (lexicographic) if depth ties.
+        Tie-breaker rules (in order):
+            1. Lower profitability wins.
+            2. If tied: greater depth wins (deeper nodes preferred).
+            3. If still tied: larger flight_code lexicographically wins.
+
+        Args:
+            node: Root node of subtree to search (None returns None).
+            depth (int): Current depth (used for tie-breaking, default: 0).
+        
+        Returns:
+            Node with minimum profitability, or None if input is None.
         """
         if node is None:
             return None

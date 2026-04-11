@@ -14,7 +14,6 @@ from src.modelos.AVLTree import AVLTree
 from src.modelos.FlightNode import FlightNode
 from src.acceso_datos.DataStorage import DataStorage
 
-
 # Fields that can be updated without changing the AVL key (flight_code).
 _UPDATABLE_FIELDS = {
     "origin",
@@ -40,8 +39,7 @@ class AVLTreeManager:
         Initialise the manager.
 
         Args:
-            tree (AVLTree, optional): Existing tree to manage. Creates a new
-                                      empty tree when not provided.
+            tree (AVLTree, optional): Existing tree to manage. Creates a new empty tree when not provided.
         """
         self.tree: AVLTree = tree if tree is not None else AVLTree()
         self._storage = DataStorage()
@@ -104,9 +102,9 @@ class AVLTreeManager:
         Configure how the managed AVL tree balances insertions.
 
         Args:
-            enabled (bool): ``True`` to defer rotations during insertions,
-                ``False`` to restore immediate balancing.
-            rebalance_when_disabling (bool): When ``True``, a global rebalance
+            enabled (bool): True to defer rotations during insertions,
+                False to restore immediate balancing.
+            rebalance_when_disabling (bool): When True, a global rebalance
                 is executed automatically when leaving stress mode.
         """
         self.tree.set_stress_mode(
@@ -223,9 +221,9 @@ class AVLTreeManager:
         """
         Modify one or more fields of an existing flight node.
 
-        Non-key fields are updated in-place.  If ``new_flight_code`` is
+        Non-key fields are updated in-place.  If new_flight_code is
         supplied the node is deleted and re-inserted under the new code so that
-        BST ordering is preserved.
+        AVL ordering is preserved.
 
         Updatable fields (keyword arguments):
             new_flight_code (str)   : Rename the primary key.

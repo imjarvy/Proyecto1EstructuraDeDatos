@@ -42,9 +42,6 @@ Proyecto1EstructuraDeDatos/
 │   │   ├── DataStorage.py          ├─ Orquestador central
 │   │   └── VersionManager.py       └─ Sistema de versionado
 │   │
-│   ├── controllers/                ← Lógica de control
-│   │   └── QueueController.py      ← Procesador de cola FIFO
-│   │
 │   ├── modelos/                    ← Estructuras de datos
 │   │   ├── AVLTree.py              ├─ Árbol AVL (CORE)
 │   │   ├── BST.py                  ├─ Árbol binario (comparativa)
@@ -53,14 +50,21 @@ Proyecto1EstructuraDeDatos/
 │   │
 │   ├── negocio/                    ← Lógica de negocios
 │   │   ├── AVLTreeManager.py       ├─ Operaciones CRUD
+│   │   ├── QueueController.py      ├─ Procesador de cola FIFO
 │   │   └── TreeAnalysisManager.py  └─ Análisis y auditoría
 │   │
 │   ├── routes/                     ← Endpoints REST
-│   │   └── queue_routes.py         ← Blueprint de cola
+│   │   ├── flight_routes.py        ├─ Blueprint de operaciones de árbol y vuelos
+│   │   └── queue_routes.py         └─ Blueprint de cola
 │   │
 │   └── presentacion/               ← Frontend
 │       ├── estilos/
-│       │   └── styles.css          ← Tema + modo estrés
+│       │   └── styles.css          ├─ Tema + modo estrés
+│       ├── scripts/
+│       │   ├── script.js           ├─ Coordinador frontend
+│       │   ├── handlers.js         ├─ Event listeners y orquestación
+│       │   ├── treeUi.js           ├─ Renderizado de árbol con D3.js
+│       │   └── queueUi.js          └─ Interfaz de cola
 │       └── vistas/
 │           └── index.html          ← Aplicación SPA
 │
@@ -75,11 +79,14 @@ Proyecto1EstructuraDeDatos/
 | Componente | Responsabilidad |
 |---|---|
 | **AVLTree.py** | Árbol autobalanceado con rotaciones (LL, RR, LR, RL) y modo estrés |
-| **DataStorage.py** | Orquestador central: carga, guardado, versionado |
-| **AVLTreeManager.py** | Operaciones CRUD con validación exhaustiva |
-| **TreeAnalysisManager.py** | Auditoría, penalización por profundidad, rentabilidad |
-| **Flask (app.py)** | API REST con endpoints para todas las operaciones |
-| **Frontend (index.html)** | Visualización D3.js con sincronización en tiempo real |
+| **FlightNode.py** | Estructura de datos para nodo de vuelo con atributos comerciales |
+| **DataStorage.py** | Orquestador central: carga, guardado, versionado, persistencia |
+| **AVLTreeManager.py** | Operaciones CRUD con validación exhaustiva y undo/redo |
+| **QueueController.py** | Procesamiento de cola FIFO con detección de conflictos |
+| **TreeAnalysisManager.py** | Auditoría AVL, penalización por profundidad, análisis de rentabilidad |
+| **flight_routes.py** | Endpoints REST para operaciones de árbol, CRUD y análisis |
+| **queue_routes.py** | Endpoints REST para gestión de cola |
+| **Frontend (scripts/)** | Módulos JavaScript: coordinador, handlers, renderizado D3, interfaz de cola |
 
 ---
 
@@ -198,18 +205,5 @@ Proyecto1EstructuraDeDatos/
 | `POST` | `/api/queue/process-one` | Inserta siguiente vuelo |
 | `POST` | `/api/queue/process-all` | Drena cola completa |
 | `DELETE` | `/api/queue/clear` | Limpia todos los vuelos pendientes |
-
----
-
-## ✨ Características destacadas
-
-✅ **Visualización en tiempo real** con D3.js  
-✅ **Tema dinámico** (modo normal + modo estrés visual)  
-✅ **Validación exhaustiva** en tres niveles (entrada → lógica → negocio)  
-✅ **Análisis económico integrado** (profundidad, rentabilidad, penalización)  
-✅ **Versionado completo** con snapshots instantáneos  
-✅ **Deshacer ilimitado** (Ctrl+Z) sin límite de profundidad  
-✅ **Auditoría integrada** para verificar invariantes AVL  
-✅ **Modo estrés** para demostraciones y análisis de comportamiento  
 
 ---

@@ -2,10 +2,5 @@ __pycache__/
 *.pyc
 .vscode/
 .idea/
-CONTEXTO_PROYECTO.md
-probar_controller.py
-probar_queue.py
-probar_routes.py
-ANALISIS_AUDITORIA_AVL.md
 /versions
 /.venv

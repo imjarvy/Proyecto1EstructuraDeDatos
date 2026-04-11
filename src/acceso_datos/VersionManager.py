@@ -13,7 +13,6 @@ from datetime import datetime
 from src.modelos.FlightNode import FlightNode
 from src.acceso_datos.DataPersistence import DataPersistence
 
-
 class VersionManager:
     """
     Manages version snapshots of tree states.
@@ -173,95 +172,9 @@ class VersionManager:
                 json.dump(payload, file, indent=2, ensure_ascii=False)
             return True
         except OSError as e:
-            print(f"Error writing version file '{file_path}': {e}")
-            return False
-    
-    def save_version(self, root: Optional[FlightNode], version_name: str, rotation_count: Optional[Dict] = None, cascade_rebalance_count: int = 0, mass_cancellation_count: int = 0) -> bool:
-        """
-        Save current tree state as a named version.
-        
-        Args:
-            root (Optional[FlightNode]): Root node of the tree to save.
-            version_name (str): Descriptive name for this version. 
-            rotation_count (dict, optional): Rotation operation counts 
-            cascade_rebalance_count (int, optional): Number of cascade 
-            mass_cancellation_count (int, optional): Reserved for future use. 
-            
-        Returns:
-            bool: True if save successful, False otherwise.
-        """
-        if not root:
-            print("Error: Cannot save version with empty tree.")
+            print(f"Error escribiendo el archivo de la versión. '{file_path}': {e}")
             return False
         
-        if not version_name or not version_name.strip():
-            print("Error: Version name cannot be empty.")
-            return False
-        
-        try:
-            payload = self._build_version_payload(root, version_name, rotation_count=rotation_count, cascade_rebalance_count=cascade_rebalance_count, mass_cancellation_count=mass_cancellation_count)
-            if not payload:
-                print("Error: Failed to serialize tree.")
-                return False
-
-            existing_file = self._find_file_by_version_name(version_name)
-            if existing_file is not None:
-                target_path = existing_file
-            else:
-                safe_name = self._sanitize_name(version_name)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                target_path = self.versions_dir / f"{safe_name}_{timestamp}.json"
-
-            if not self._write_payload(target_path, payload):
-                return False
-
-            print(f"Version '{version_name}' saved successfully.")
-            return True
-        
-        except Exception as e:
-            print(f"Error saving version: {e}")
-            return False
-    
-    def restore_version(self, version_name: str) -> Optional[FlightNode]:
-        """
-        Restore tree state from a saved version.
-        
-        Args:
-            version_name (str): Name of version to restore.
-            
-        Returns:
-            Optional[FlightNode]: Root node of the restored tree, or None if restoration fails.
-        """
-        version_file = self._find_file_by_version_name(version_name)
-        if version_file is None:
-            print(f"Error: Version '{version_name}' not found.")
-            print(f"Available versions: {self._get_available_versions()}")
-            return None
-        
-        try:
-            payload = self._read_version_file(version_file)
-            if not payload:
-                print(f"Error: Version file for '{version_name}' is unreadable.")
-                return None
-
-            tree_data = self._extract_tree_data(payload)
-            if not tree_data:
-                print(f"Error: Version '{version_name}' has invalid tree data.")
-                return None
-
-            restored_root = self.persistence.deserialize_tree_from_dict(tree_data)
-            
-            if restored_root:
-                print(f"Version '{version_name}' restored successfully.")
-                return restored_root
-            else:
-                print(f"Error: Failed to deserialize version '{version_name}'.")
-                return None
-        
-        except Exception as e:
-            print(f"Error restoring version: {e}")
-            return None
-    
     def _get_available_versions(self) -> str:
         """
         Get formatted string of available versions.
@@ -284,33 +197,91 @@ class VersionManager:
         versions = list(dict.fromkeys(versions))
         return ", ".join(versions) if versions else "None"
     
-    def get_version_info(self, version_name: str) -> Optional[Dict]:
+    def save_version(self, root: Optional[FlightNode], version_name: str, rotation_count: Optional[Dict] = None, cascade_rebalance_count: int = 0, mass_cancellation_count: int = 0) -> bool:
         """
-        Get metadata about a specific version.
+        Save current tree state as a named version.
         
         Args:
-            version_name (str): Name of version.
+            root (Optional[FlightNode]): Root node of the tree to save.
+            version_name (str): Descriptive name for this version. 
+            rotation_count (dict, optional): Rotation operation counts 
+            cascade_rebalance_count (int, optional): Number of cascade 
+            mass_cancellation_count (int, optional): Reserved for future use. 
             
         Returns:
-            Optional[Dict]: Metadata dictionary
+            bool: True if save successful, False otherwise.
+        """
+        if not root:
+            print("Error: no se puede guardar la versión con un árbol vacío.")
+            return False
+        
+        if not version_name or not version_name.strip():
+            print("Error: El nombre de la versión no puede estar vacío.")
+            return False
+        
+        try:
+            payload = self._build_version_payload(root, version_name, rotation_count=rotation_count, cascade_rebalance_count=cascade_rebalance_count, mass_cancellation_count=mass_cancellation_count)
+            if not payload:
+                print("Error: fallo al serializar el árbol.")
+                return False
 
+            existing_file = self._find_file_by_version_name(version_name)
+            if existing_file is not None:
+                target_path = existing_file
+            else:
+                safe_name = self._sanitize_name(version_name)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                target_path = self.versions_dir / f"{safe_name}_{timestamp}.json"
+
+            if not self._write_payload(target_path, payload):
+                return False
+
+            print(f"Versión '{version_name}' guardada exitosamente.")
+            return True
+        
+        except Exception as e:
+            print(f"Error guardando la versión: {e}")
+            return False
+    
+    def restore_version(self, version_name: str) -> Optional[FlightNode]:
+        """
+        Restore tree state from a saved version.
+        
+        Args:
+            version_name (str): Name of version to restore.
+            
+        Returns:
+            Optional[FlightNode]: Root node of the restored tree, or None if restoration fails.
         """
         version_file = self._find_file_by_version_name(version_name)
         if version_file is None:
-            print(f"Error: Version '{version_name}' not found.")
+            print(f"Error: Versión '{version_name}' no encontrada.")
+            print(f"Versions disponibles: {self._get_available_versions()}")
             return None
+        
+        try:
+            payload = self._read_version_file(version_file)
+            if not payload:
+                print(f"Error: el archivo de la versión '{version_name}' es ilegible.")
+                return None
 
-        payload = self._read_version_file(version_file)
-        if not payload:
-            print(f"Error: Version file for '{version_name}' is unreadable.")
+            tree_data = self._extract_tree_data(payload)
+            if not tree_data:
+                print(f"Error: La versión '{version_name}' tiene datos de árbol inválidos.")
+                return None
+
+            restored_root = self.persistence.deserialize_tree_from_dict(tree_data)
+            
+            if restored_root:
+                print(f"Versión '{version_name}' restaurada exitosamente.")
+                return restored_root
+            else:
+                print(f"Error: fallo al deserializar la versión '{version_name}'.")
+                return None
+        
+        except Exception as e:
+            print(f"Error al restaurar la versión: {e}")
             return None
-
-        metadata = payload.get("metadata", {})
-        if not isinstance(metadata, dict):
-            print(f"Error: Version '{version_name}' has invalid metadata.")
-            return None
-
-        return metadata.copy()
     
     def delete_version(self, version_name: str) -> bool:
         """
@@ -324,17 +295,17 @@ class VersionManager:
         """
         version_file = self._find_file_by_version_name(version_name)
         if version_file is None:
-            print(f"Error: Version '{version_name}' not found.")
+            print(f"Error: Versión '{version_name}' no encontrada.")
             return False
         
         try:
             version_file.unlink()
             
-            print(f"Version '{version_name}' deleted successfully.")
+            print(f"Versión '{version_name}' eliminada exitosamente.")
             return True
         
         except OSError as e:
-            print(f"Error deleting version: {e}")
+            print(f"Error eliminando la versión: {e}")
             return False
     
     def get_all_versions_info(self) -> Dict[str, Dict]:
@@ -359,3 +330,31 @@ class VersionManager:
                 info[version_name] = metadata.copy()
 
         return info
+    
+    def get_version_info(self, version_name: str) -> Optional[Dict]:
+        """
+        Get metadata about a specific version.
+        
+        Args:
+            version_name (str): Name of version.
+            
+        Returns:
+            Optional[Dict]: Metadata dictionary
+
+        """
+        version_file = self._find_file_by_version_name(version_name)
+        if version_file is None:
+            print(f"Error: Versión '{version_name}' no encontrada.")
+            return None
+
+        payload = self._read_version_file(version_file)
+        if not payload:
+            print(f"Error: el archivo de la versión '{version_name}' es ilegible.")
+            return None
+
+        metadata = payload.get("metadata", {})
+        if not isinstance(metadata, dict):
+            print(f"Error: Versión '{version_name}' tiene metadata inválida.")
+            return None
+
+        return metadata.copy()

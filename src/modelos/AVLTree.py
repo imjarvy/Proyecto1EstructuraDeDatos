@@ -1,14 +1,12 @@
 """
 AVL Tree implementation for SkyBalance Flight Management System.
 
-This class implements a self-balancing AVL tree structure adapted from the
-classroom implementation to work with FlightNode objects and integrate with
-the DataStorage persistence system.
+This class implements a self-balancing AVL tree structure that works
+with FlightNode objects and integrate with the DataStorage persistence system.
 """
 
 from typing import Optional, List, Dict, Any
 from src.modelos.FlightNode import FlightNode
-
 
 class AVLTree:
     """
@@ -48,7 +46,7 @@ class AVLTree:
 
         In normal mode the tree is rebalanced immediately after the insertion.
         In stress mode only heights and balance factors are refreshed; rotations
-        are deferred until ``global_rebalance`` is called.
+        are deferred until global_rebalance is called.
         
         Args:
             flight_node (FlightNode): Node to insert.
@@ -78,7 +76,7 @@ class AVLTree:
             new_node (FlightNode): Node to be inserted.
         """
         if new_node.flight_code == current.flight_code:
-            print(f"Flight code {new_node.flight_code} already exists in tree.")
+            print(f"El código de vuelo {new_node.flight_code} ya existe en el árbol.")
             return
         
         if new_node.flight_code < current.flight_code:
@@ -157,12 +155,12 @@ class AVLTree:
             bool: True if deletion successful, False otherwise.
         """
         if self.root is None:
-            print("Tree is empty.")
+            print("El árbol está vacío.")
             return False
         
         node = self.search(flight_code)
         if node is None:
-            print(f"Flight {flight_code} not found in tree.")
+            print(f"Vuelo {flight_code} no encontrado en el árbol.")
             return False
         
         self._delete_node(node)
@@ -203,12 +201,12 @@ class AVLTree:
             int: Number of removed nodes (0 when code is not found).
         """
         if self.root is None:
-            print("Tree is empty.")
+            print("El árbol está vacío.")
             return 0
 
         target = self.search(flight_code)
         if target is None:
-            print(f"Flight {flight_code} not found in tree.")
+            print(f"Vuelo {flight_code} no encontrado en el árbol.")
             return 0
 
         removed_count = self._count_subtree_nodes(target)
@@ -354,7 +352,8 @@ class AVLTree:
             List[FlightNode]: Nodes in breadth-first order.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            print("El árbol está vacío.")
+            return []
         
         queue = [self.root]
         result = []
@@ -379,7 +378,8 @@ class AVLTree:
             List[FlightNode]: Nodes in pre-order sequence.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            print("El árbol está vacío.")
+            return []
         
         result = []
         self._pre_order_traversal_recursive(self.root, result)
@@ -412,7 +412,8 @@ class AVLTree:
             List[FlightNode]: Nodes in in-order sequence.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            print("El árbol está vacío.")
+            return []
         
         result = []
         self._in_order_traversal_recursive(self.root, result)
@@ -445,7 +446,8 @@ class AVLTree:
             List[FlightNode]: Nodes in post-order sequence.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            print("El árbol está vacío.")
+            return []
         
         result = []
         self._post_order_traversal_recursive(self.root, result)
@@ -708,36 +710,6 @@ class AVLTree:
             return -1 
         return node.height
     
-    def get_node_height(self, flight_code: str) -> int:
-        """
-        Get height of a specific node by flight code.
-        
-        Args:
-            flight_code (str): Flight code to search.
-            
-        Returns:
-            int: Height of the node, or -1 if not found.
-        """
-        node = self.search(flight_code)
-        return self._calculate_node_height(node) if node else -1
-    
-    def _calculate_node_height(self, node: Optional[FlightNode]) -> int:
-        """
-        Recursively calculate actual height of a node.
-        
-        Args:
-            node (FlightNode): Node to calculate height for.
-            
-        Returns:
-            int: Calculated height.
-        """
-        if node is None:
-            return -1
-        
-        left_height = self._calculate_node_height(node.left)
-        right_height = self._calculate_node_height(node.right)
-        return max(left_height, right_height) + 1
-    
     def get_tree_height(self) -> int:
         """
         Get height of entire tree.
@@ -748,7 +720,7 @@ class AVLTree:
         if self.root is None:
             return -1
         
-        return self._calculate_node_height(self.root)
+        return self.root.height
     
     def get_tree_weight(self) -> int:
         """
@@ -776,41 +748,6 @@ class AVLTree:
             return 1
         
         return self.get_leaf_count(node.left) + self.get_leaf_count(node.right)
-    
-    def get_node_depth(self, flight_code: str) -> int:
-        """
-        Get depth of a specific node (distance from root).
-        
-        Args:
-            flight_code (str): Flight code to search.
-            
-        Returns:
-            int: Depth of the node, or -1 if not found.
-        """
-        node = self.search(flight_code)
-        if node is None:
-            return -1
-        
-        return self._calculate_node_depth(node, 0)
-    
-    def _calculate_node_depth(self, node: Optional[FlightNode], count: int) -> int:
-        """
-        Recursively calculate node depth.
-        
-        Args:
-            node (FlightNode): Current node.
-            count (int): Current depth counter.
-            
-        Returns:
-            int: Calculated depth.
-        """
-        if node is None:
-            return -1
-
-        if node is self.root:
-            return count
-        
-        return self._calculate_node_depth(node.parent, count + 1)
     
     def get_properties(self) -> Dict[str, Any]:
         """
@@ -851,10 +788,10 @@ class AVLTree:
         Enable or disable stress mode for future insertions.
 
         Args:
-            enabled (bool): ``True`` to defer rotations on insert, ``False`` to
+            enabled (bool): True to defer rotations on insert, False to
                 restore immediate balancing.
-            rebalance_when_disabling (bool): When ``True`` and the tree leaves
-                stress mode, ``global_rebalance`` is executed before returning.
+            rebalance_when_disabling (bool): When True and the tree leaves
+                stress mode, global_rebalance is executed before returning.
         """
         was_stress_mode = self.stress_mode
         self.stress_mode = enabled

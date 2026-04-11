@@ -7,21 +7,13 @@ in the AVL tree. Each node contains flight operational data and tree structure i
 
 from typing import Optional
 
-
 class FlightNode:
     """
     Represents a flight node in the AVL tree structure.
     
-    Attributes:
-        we have many attributes, they are in the constructor, the next ones its just for remember the complex ones for me:
-        promotion (float): Active promotion discount (0 if none).
-        alert (str): Alert status for this flight (empty if none).
-        priority (int): Flight priority level (1-5, where 5 is highest).
-        height (int): Height of the node in the AVL tree.
-        balance_factor (int): Balance factor for AVL property (-1, 0, or 1).
-        left (FlightNode): Reference to left child node.
-        right (FlightNode): Reference to right child node.
-        parent (FlightNode): Reference to parent node.
+    It contains all relevant flight information along with attributes 
+    necessary for AVL tree operations such as height and balance factor. 
+    Also includes references to left and right children and the parent node.
     """
     
     def __init__(self, flight_code: str, origin: str, destination: str, base_price: float, passengers: int = 0, promotion: float = 0.0, alert: str = "", priority: int = 3):
@@ -103,5 +95,10 @@ class FlightNode:
         return node
     
     def __repr__(self) -> str:
-        """Return string representation of the flight node."""
+        """
+        Return string representation of the flight node.
+        
+        Returns:
+            str: Formatted string showing flight code and route.
+        """
         return f"FlightNode({self.flight_code}: {self.origin}->{self.destination})"

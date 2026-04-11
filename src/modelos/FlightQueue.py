@@ -8,7 +8,6 @@ It also tracks processed flights and conflict records generated during queue pro
 from src.modelos.FlightNode import FlightNode
 from typing import Optional
 
-
 class FlightQueue:
     """
     FIFO queue for managing pending flight insertion requests.
@@ -30,13 +29,11 @@ class FlightQueue:
         self._processed: list[FlightNode] = []
         self._conflicts: list[dict] = []
 
-
     # ================ENQUEUE / DEQUEUE=======================
     def enqueue(self, flight_node: FlightNode) -> None:
         self._queue.append(flight_node)
 
     def dequeue(self) -> Optional[FlightNode]:
-    
         if self.is_empty():
             return None
         return self._queue.pop(0)
@@ -51,7 +48,6 @@ class FlightQueue:
         if self.is_empty():
             return None
         return self._queue[0]
-
 
     # ===================QUEUE STATUS=================
 
@@ -80,11 +76,11 @@ class FlightQueue:
         self._queue.clear()
 
     # ================CONFLICT TRACKING====================
+    
     def register_conflict(self, flight_node: FlightNode, reason: str) -> None:
         """
         Register a flight that caused a processing conflict.
         """
-
         self._conflicts.append({
             "flight_code": flight_node.flight_code,
             "origin": flight_node.origin,

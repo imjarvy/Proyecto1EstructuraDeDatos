@@ -4,12 +4,11 @@ Binary Search Tree (BST) implementation for SkyBalance Flight Management System.
 This is a simplified BST used for comparison purposes with the AVL tree.
 It maintains all flight nodes without automatic balancing.
 
-Only insertion and visualization are supported (no deletion).
+Only insertion is supported.
 """
 
 from typing import Optional, List, Dict, Any
 from src.modelos.FlightNode import FlightNode
-
 
 class BST:
     """
@@ -123,7 +122,8 @@ class BST:
             List[FlightNode]: Nodes in breadth-first order.
         """
         if self.root is None:
-            raise Exception("Tree is empty.")
+            print("El árbol está vacío.")
+            return []
         
         queue = [self.root]
         result = []

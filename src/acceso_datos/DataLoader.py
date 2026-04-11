@@ -104,11 +104,11 @@ class DataLoader:
         # Step 1: Load and parse JSON
         ok, error = self.load_from_stream(stream)
         if not ok:
-            return None, error or "No se pudo leer el JSON"
+            return None, error or "No se pudo leer el JSON."
         
         data = self.get_raw_data()
         if not isinstance(data, dict):
-            return None, "El JSON debe ser un objeto raíz válido"
+            return None, "El JSON debe ser un objeto raíz válido."
         
         # Step 2: Auto-detect actual type from structure
         detected_type = self.get_reconstruction_mode()
@@ -116,7 +116,7 @@ class DataLoader:
             return None, (
                 "El archivo JSON no contiene una estructura válida. "
                 "Debe ser topología (root_code + tree_structure) "
-                "o inserción (flights list)."
+                "o inserción (flights)."
             )
         
         # Step 3: Validate detected type matches expected type
