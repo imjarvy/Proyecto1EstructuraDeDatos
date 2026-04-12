@@ -14,6 +14,7 @@ export function registerHandlers({
   clearBstPanel,
   clearForm,
   getFormPayload,
+  syncStressModeUi,
 }) {
   document.getElementById("loadJsonBtn").addEventListener("click", () => openModal("jsonModal"));
 
@@ -44,6 +45,14 @@ export function registerHandlers({
       } else {
         clearBstPanel();
       }
+
+      if (typeof data.stress_mode === "boolean") {
+        syncStressModeUi(data.stress_mode);
+      }
+      if (typeof data.critical_depth === "number") {
+        document.getElementById("criticalDepth").value = data.critical_depth;
+      }
+      clearForm();
 
       closeModal("jsonModal");
       showToast("Árbol cargado correctamente", "success");
@@ -142,29 +151,16 @@ export function registerHandlers({
 
     try {
       const data = await api("/api/toggle-stress-mode", "POST", { stress_mode: nextState });
-      state.stressMode = data.stress_mode;
       updatePanels(data.tree);
       if (!data.bst_tree) clearBstPanel();
 
-      const button = document.getElementById("stressModeBtn");
-      const banner = document.getElementById("stressBanner");
-      const auditButton = document.getElementById("auditAvlBtn");
-
-      if (state.stressMode) {
-        button.textContent = "Desactivar Estrés";
-        button.classList.add("active-stress");
-        banner.classList.remove("hidden");
-        auditButton.style.display = "inline-block";
-        document.body.classList.add("stress-active");
-        showToast("Modo Estrés activado", "warn");
-      } else {
-        button.textContent = "Modo Estrés";
-        button.classList.remove("active-stress");
-        banner.classList.add("hidden");
-        auditButton.style.display = "none";
-        document.body.classList.remove("stress-active");
-        showToast(`Modo normal restaurado — ${data.rotations_done} rotaciones aplicadas`, "success");
-      }
+      syncStressModeUi(data.stress_mode);
+      showToast(
+        data.stress_mode
+          ? "Modo Estrés activado"
+          : `Modo normal restaurado — ${data.rotations_done} rotaciones aplicadas`,
+        data.stress_mode ? "warn" : "success"
+      );
     } catch (_) {}
   });
 
@@ -265,6 +261,15 @@ export function registerHandlers({
           try {
             const data = await api("/api/restore-version", "POST", { version_name: versionName });
             updatePanels(data.tree);
+
+            if (typeof data.stress_mode === "boolean") {
+              syncStressModeUi(data.stress_mode);
+            }
+            if (typeof data.critical_depth === "number") {
+              document.getElementById("criticalDepth").value = data.critical_depth;
+            }
+            clearForm();
+
             closeModal("versionsModal");
             showToast(`Versión "${versionName}" restaurada`, "success");
           } catch (_) {}

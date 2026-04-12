@@ -142,7 +142,11 @@ def tree_state():
     Returns:
         JSON: Complete tree structure and metadata.
     """
-    return jsonify({"tree": _tree_payload()})
+    return jsonify({
+        "tree": _tree_payload(),
+        "stress_mode": _manager.tree.stress_mode,
+        "critical_depth": _critical_depth,
+    })
 
 
 @flight_bp.route("/api/load-tree", methods=["POST"])
@@ -176,7 +180,11 @@ def load_tree():
     if bst is not None:
         _bst_tree = bst
 
-    response = {"tree": _tree_payload()}
+    response = {
+        "tree": _tree_payload(),
+        "stress_mode": _manager.tree.stress_mode,
+        "critical_depth": _critical_depth,
+    }
     if load_type == "insertion":
         response["bst_tree"] = _bst_payload()
 
@@ -524,7 +532,11 @@ def restore_version():
 
     _manager.tree = new_avl
     _manager._undo_stack.clear()
-    return jsonify({"tree": _tree_payload()})
+    return jsonify({
+        "tree": _tree_payload(),
+        "stress_mode": _manager.tree.stress_mode,
+        "critical_depth": _critical_depth,
+    })
 
 
 @flight_bp.route("/api/list-versions", methods=["GET"])

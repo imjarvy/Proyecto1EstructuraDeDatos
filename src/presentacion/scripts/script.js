@@ -63,6 +63,48 @@ function registerModalCloseHandlers() {
   });
 }
 
+function syncStressModeUi(enabled) {
+  const button = document.getElementById("stressModeBtn");
+  const banner = document.getElementById("stressBanner");
+  const auditButton = document.getElementById("auditAvlBtn");
+
+  state.stressMode = enabled;
+
+  if (enabled) {
+    button.textContent = "Desactivar Estrés";
+    button.classList.add("active-stress");
+    banner.classList.remove("hidden");
+    auditButton.style.display = "inline-block";
+    document.body.classList.add("stress-active");
+    return;
+  }
+
+  button.textContent = "Modo Estrés";
+  button.classList.remove("active-stress");
+  banner.classList.add("hidden");
+  auditButton.style.display = "none";
+  document.body.classList.remove("stress-active");
+}
+
+async function hydrateInitialState(treeUi) {
+  try {
+    const data = await api("/api/tree-state");
+    treeUi.updatePanels(data.tree);
+
+    if (typeof data.stress_mode === "boolean") {
+      syncStressModeUi(data.stress_mode);
+    }
+
+    if (typeof data.critical_depth === "number") {
+      document.getElementById("criticalDepth").value = data.critical_depth;
+    }
+
+    if (!data.tree?.root) {
+      treeUi.clearBstPanel();
+    }
+  } catch (_) {}
+}
+
 function initializeApp() {
   const treeUi = createTreeUi({ state, showToast });
 
@@ -78,8 +120,11 @@ function initializeApp() {
     clearBstPanel: treeUi.clearBstPanel,
     clearForm: treeUi.clearForm,
     getFormPayload: treeUi.getFormPayload,
+    syncStressModeUi,
   });
   createQueueUi({ api, showToast, updatePanels: treeUi.updatePanels });
+
+  hydrateInitialState(treeUi);
 }
 
 initializeApp();
