@@ -44,6 +44,7 @@ class AVLTreeManager:
         self.tree: AVLTree = tree if tree is not None else AVLTree()
         self._storage = DataStorage()
         self._undo_stack: List[Dict[str, Any]] = []
+        self.critical_depth: int = 5
         
     #   UNDO STACK (Crtl+Z)
     def _snapshot_state(self) -> Dict[str, Any]:
@@ -54,11 +55,16 @@ class AVLTreeManager:
             "cascade_rebalance_count": self.tree.cascade_rebalance_count,
             "mass_cancellation_count": self.tree.mass_cancellation_count,
             "stress_mode": self.tree.stress_mode,
+            "critical_depth": self.critical_depth,
         }
 
     def _push_undo_state(self) -> None:
         """Store current state so next mutating operation can be reverted."""
         self._undo_stack.append(self._snapshot_state())
+
+    def record_undo_state(self) -> None:
+        """Public helper to snapshot state for route-level mutations."""
+        self._push_undo_state()
 
     def can_undo(self) -> bool:
         """Return True when at least one previous state is available."""
@@ -91,6 +97,7 @@ class AVLTreeManager:
             snapshot.get("mass_cancellation_count", self.tree.mass_cancellation_count)
         )
         self.tree.stress_mode = bool(snapshot.get("stress_mode", self.tree.stress_mode))
+        self.critical_depth = int(snapshot.get("critical_depth", self.critical_depth))
         return True
 
     def set_stress_mode(

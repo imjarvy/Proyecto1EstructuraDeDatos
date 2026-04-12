@@ -142,6 +142,15 @@ export function registerHandlers({
       const data = await api("/api/undo", "POST");
       updatePanels(data.tree);
       if (!data.bst_tree) clearBstPanel();
+
+      if (typeof data.stress_mode === "boolean") {
+        syncStressModeUi(data.stress_mode);
+      }
+      if (typeof data.critical_depth === "number") {
+        document.getElementById("criticalDepth").value = data.critical_depth;
+      }
+      clearForm();
+
       showToast("Acción deshecha", "info");
     } catch (_) {}
   });

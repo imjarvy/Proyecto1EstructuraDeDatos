@@ -15,7 +15,6 @@ _manager = None
 _bst_tree = None
 _data_storage = None
 _analysis = None
-_critical_depth = 5
 
 
 def init_flight_routes(manager, bst_tree, data_storage, analysis, critical_depth=5):
@@ -29,12 +28,12 @@ def init_flight_routes(manager, bst_tree, data_storage, analysis, critical_depth
         analysis: TreeAnalysisManager instance for analysis operations.
         critical_depth (int): Initial critical depth value for pricing penalty.
     """
-    global _manager, _bst_tree, _data_storage, _analysis, _critical_depth
+    global _manager, _bst_tree, _data_storage, _analysis
     _manager = manager
     _bst_tree = bst_tree
     _data_storage = data_storage
     _analysis = analysis
-    _critical_depth = critical_depth
+    _manager.critical_depth = critical_depth
 
 
 def _node_to_dict(node, depth: int = 0):
@@ -52,7 +51,7 @@ def _node_to_dict(node, depth: int = 0):
         return None
     data = node.to_dict()
     data["depth"] = depth
-    data["is_critical"] = depth > _critical_depth
+    data["is_critical"] = depth > _manager.critical_depth
     data["left"] = _node_to_dict(node.left, depth + 1)
     data["right"] = _node_to_dict(node.right, depth + 1)
     return data
@@ -145,7 +144,7 @@ def tree_state():
     return jsonify({
         "tree": _tree_payload(),
         "stress_mode": _manager.tree.stress_mode,
-        "critical_depth": _critical_depth,
+        "critical_depth": _manager.critical_depth,
     })
 
 
@@ -183,7 +182,7 @@ def load_tree():
     response = {
         "tree": _tree_payload(),
         "stress_mode": _manager.tree.stress_mode,
-        "critical_depth": _critical_depth,
+        "critical_depth": _manager.critical_depth,
     }
     if load_type == "insertion":
         response["bst_tree"] = _bst_payload()
@@ -386,7 +385,11 @@ def undo():
     ok = _manager.undo_last_action()
     if not ok:
         return jsonify({"error": "No hay acciones para deshacer"}), 400
-    return jsonify({"tree": _tree_payload()})
+    return jsonify({
+        "tree": _tree_payload(),
+        "stress_mode": _manager.tree.stress_mode,
+        "critical_depth": _manager.critical_depth,
+    })
 
 
 @flight_bp.route("/api/toggle-stress-mode", methods=["POST"])
@@ -404,6 +407,9 @@ def toggle_stress_mode():
     """
     body = request.get_json(silent=True) or {}
     new_state = bool(body.get("stress_mode", not _manager.tree.stress_mode))
+
+    if new_state != _manager.tree.stress_mode:
+        _manager.record_undo_state()
 
     rotations_done = 0
     if not new_state:
@@ -427,6 +433,7 @@ def global_rebalance():
     Returns:
         JSON: Number of rotations performed and updated tree state.
     """
+    _manager.record_undo_state()
     rotations = _manager.global_rebalance()
     return jsonify({"rotations_done": rotations, "tree": _tree_payload()})
 
@@ -457,19 +464,21 @@ def update_critical_depth():
     Returns:
         JSON: New critical depth value and updated tree state or error.
     """
-    global _critical_depth
     body = request.get_json(silent=True) or {}
 
     try:
         value = int(body.get("critical_depth", 5))
         if value < 1:
             return jsonify({"error": "La profundidad crítica debe ser mayor a 0"}), 400
-        _critical_depth = value
     except (ValueError, TypeError):
         return jsonify({"error": "La profundidad crítica debe ser un número entero"}), 400
 
-    _analysis.apply_depth_penalties(_manager.tree.root, 0, _critical_depth)
-    return jsonify({"critical_depth": _critical_depth, "tree": _tree_payload()})
+    if value != _manager.critical_depth:
+        _manager.record_undo_state()
+
+    _manager.critical_depth = value
+    _analysis.apply_depth_penalties(_manager.tree.root, 0, _manager.critical_depth)
+    return jsonify({"critical_depth": _manager.critical_depth, "tree": _tree_payload()})
 
 
 @flight_bp.route("/api/save-version", methods=["POST"])
@@ -535,7 +544,7 @@ def restore_version():
     return jsonify({
         "tree": _tree_payload(),
         "stress_mode": _manager.tree.stress_mode,
-        "critical_depth": _critical_depth,
+        "critical_depth": _manager.critical_depth,
     })
 
 
