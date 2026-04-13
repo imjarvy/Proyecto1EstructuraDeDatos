@@ -216,6 +216,7 @@ class BST:
                 "node_count": 0
             }
         
+        
         return {
             "tree_type": "BST",
             "root": self.root.flight_code,
