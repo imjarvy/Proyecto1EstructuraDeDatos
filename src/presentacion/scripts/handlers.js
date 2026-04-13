@@ -229,7 +229,10 @@ export function registerHandlers({
     }
 
     try {
-      await api("/api/save-version", "POST", { version_name: name });
+      const data = await api("/api/save-version", "POST", { version_name: name });
+      if (!data.success) {
+        throw new Error("No se pudo guardar la versión");
+      }
       document.getElementById("versionName").value = "";
       showToast(`Versión "${name}" guardada`, "success");
     } catch (_) {}

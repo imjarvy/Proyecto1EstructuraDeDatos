@@ -504,7 +504,10 @@ def save_version():
         cascade_rebalance_count=_manager.tree.cascade_rebalance_count,
         mass_cancellation_count=_manager.tree.mass_cancellation_count,
     )
-    return jsonify({"success": ok})
+    if not ok:
+        return jsonify({"error": "No se pudo guardar la versión. Verifica que el árbol no esté vacío."}), 400
+
+    return jsonify({"success": True})
 
 
 @flight_bp.route("/api/restore-version", methods=["POST"])

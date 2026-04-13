@@ -75,7 +75,6 @@ export function createTreeUi({ state, showToast }) {
     const minX = Math.min(...nodes.map(d => d.x));
     const maxX = Math.max(...nodes.map(d => d.x));
     const treeWidth  = maxX - minX;
-    const treeHeight = Math.max(...nodes.map(d => d.y));
     const offsetX = (width / 2) - (treeWidth / 2) - minX;
     const offsetY = 0;
 
