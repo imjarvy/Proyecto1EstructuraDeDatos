@@ -150,6 +150,7 @@ export function registerHandlers({
         document.getElementById("criticalDepth").value = data.critical_depth;
       }
       clearForm();
+      window.dispatchEvent(new CustomEvent("queue:refresh"));
 
       showToast("Acción deshecha", "info");
     } catch (_) {}

@@ -29,6 +29,13 @@ def init_queue(manager):
     _controller = QueueController(manager, _queue)
 
 
+def undo_last_queue_change() -> bool:
+    """Restore queue state before the last successful queue mutation."""
+    if _controller is None:
+        return False
+    return _controller.undo_last_queue_change()
+
+
 # ================QUEUE STATUS============================
 
 @queue_bp.route("/api/queue", methods=["GET"])
@@ -87,6 +94,8 @@ def enqueue_flight():
         priority=int(body.get("priority", 3))
     )
 
+    _controller.record_undo_snapshot()
+    _controller.manager.record_undo_state(source="queue_enqueue")
     _queue.enqueue(node)
     return jsonify({
         "message": f"Flight {node.flight_code} queued.",
@@ -134,6 +143,9 @@ def clear_queue():
     """
     if _queue is None:
         return jsonify({"error": "Queue not initialized."}), 500
+    if not _queue.is_empty() or _queue.get_conflicts() or _queue._processed:
+        _controller.record_undo_snapshot()
+        _controller.manager.record_undo_state(source="queue_clear")
     _queue.clear()
     _queue.clear_conflicts()
     return jsonify({"message": "Queue cleared.", "pending": 0}), 200

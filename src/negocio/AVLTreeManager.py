@@ -45,9 +45,10 @@ class AVLTreeManager:
         self._storage = DataStorage()
         self._undo_stack: List[Dict[str, Any]] = []
         self.critical_depth: int = 5
+        self.last_undo_source: Optional[str] = None
         
     #   UNDO STACK (Crtl+Z)
-    def _snapshot_state(self) -> Dict[str, Any]:
+    def _snapshot_state(self, source: str = "tree_manual") -> Dict[str, Any]:
         """Capture full reversible AVL state for Ctrl+Z operations."""
         return {
             "tree_data": self._storage.serialize_tree(self.tree.root),
@@ -56,15 +57,16 @@ class AVLTreeManager:
             "mass_cancellation_count": self.tree.mass_cancellation_count,
             "stress_mode": self.tree.stress_mode,
             "critical_depth": self.critical_depth,
+            "source": source,
         }
 
-    def _push_undo_state(self) -> None:
+    def _push_undo_state(self, source: str = "tree_manual") -> None:
         """Store current state so next mutating operation can be reverted."""
-        self._undo_stack.append(self._snapshot_state())
+        self._undo_stack.append(self._snapshot_state(source=source))
 
-    def record_undo_state(self) -> None:
+    def record_undo_state(self, source: str = "route_manual") -> None:
         """Public helper to snapshot state for route-level mutations."""
-        self._push_undo_state()
+        self._push_undo_state(source=source)
 
     def can_undo(self) -> bool:
         """Return True when at least one previous state is available."""
@@ -78,9 +80,11 @@ class AVLTreeManager:
             bool: True if an action was undone, False if history is empty.
         """
         if not self._undo_stack:
+            self.last_undo_source = None
             return False
 
         snapshot = self._undo_stack.pop()
+        self.last_undo_source = str(snapshot.get("source", "tree_manual"))
         tree_data = snapshot.get("tree_data")
 
         if tree_data is None:
@@ -142,6 +146,7 @@ class AVLTreeManager:
         promotion: float = 0.0,
         alert: str = "",
         priority: int = 3,
+        undo_source: str = "tree_manual",
     ) -> FlightNode:
         """
         Create a new FlightNode and insert it into the tree.
@@ -189,7 +194,7 @@ class AVLTreeManager:
         )
         node.final_price = self._compute_final_price(base_price, promotion)
 
-        self._push_undo_state()
+        self._push_undo_state(source=undo_source)
         self.tree.insert(node)
         return node
 

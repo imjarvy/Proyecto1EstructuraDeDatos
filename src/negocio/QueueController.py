@@ -34,6 +34,34 @@ class QueueController:
         """
         self.manager = manager
         self.queue = queue
+        self._queue_undo_stack = []
+
+    def _clone_node(self, node: FlightNode) -> FlightNode:
+        """Create an independent copy of a flight node for queue snapshots."""
+        return FlightNode.from_dict(node.to_dict())
+
+    def _snapshot_queue_state(self) -> dict:
+        """Capture queue/processed/conflicts state before queue processing."""
+        return {
+            "pending": [self._clone_node(node) for node in self.queue._queue],
+            "processed": [self._clone_node(node) for node in self.queue._processed],
+            "conflicts": [conflict.copy() for conflict in self.queue._conflicts],
+        }
+
+    def record_undo_snapshot(self) -> None:
+        """Store queue state so the next queue mutation can be reverted."""
+        self._queue_undo_stack.append(self._snapshot_queue_state())
+
+    def undo_last_queue_change(self) -> bool:
+        """Restore queue state before the last successful queue mutation."""
+        if not self._queue_undo_stack:
+            return False
+
+        snapshot = self._queue_undo_stack.pop()
+        self.queue._queue = [self._clone_node(node) for node in snapshot["pending"]]
+        self.queue._processed = [self._clone_node(node) for node in snapshot["processed"]]
+        self.queue._conflicts = [conflict.copy() for conflict in snapshot["conflicts"]]
+        return True
 
     # ================SINGLE PROCESSING=======================
 
@@ -56,6 +84,7 @@ class QueueController:
         if self.queue.is_empty():
             return {"status": "empty", "message": "No pending flights in queue."}
 
+        queue_snapshot = self._snapshot_queue_state()
         flight = self.queue.dequeue()
         bf_before = self._max_balance_factor()
 
@@ -68,12 +97,14 @@ class QueueController:
                 passengers=flight.passengers,
                 promotion=flight.promotion,
                 alert=flight.alert,
-                priority=flight.priority
+                priority=flight.priority,
+                undo_source="queue_process",
             )
             self.queue._processed.append(flight)
 
             bf_after = self._max_balance_factor()
             conflict = self._detect_conflict(flight, bf_before, bf_after)
+            self._queue_undo_stack.append(queue_snapshot)
 
             return {
                 "status": "ok",

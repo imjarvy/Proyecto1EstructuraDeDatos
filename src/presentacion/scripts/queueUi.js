@@ -104,6 +104,10 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     } catch (_) {}
   }
 
+  window.addEventListener("queue:refresh", () => {
+    refreshQueue();
+  });
+
   // ── event listeners ───────────────────────────────────────
 
   document.getElementById("enqueueBtn").addEventListener("click", async () => {
@@ -113,6 +117,7 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     try {
       await api("/api/queue/enqueue", "POST", payload);
       clearQueueForm();
+      updatePanels(await getTreeState());
       showToast(`Vuelo ${payload.flight_code} encolado`, "success");
       await refreshQueue();
     } catch (_) {}
@@ -148,6 +153,7 @@ export function createQueueUi({ api, showToast, updatePanels }) {
     if (!confirm("¿Limpiar toda la cola pendiente?")) return;
     try {
       await api("/api/queue/clear", "DELETE");
+      updatePanels(await getTreeState());
       showToast("Cola limpiada", "info");
       await refreshQueue();
     } catch (_) {}

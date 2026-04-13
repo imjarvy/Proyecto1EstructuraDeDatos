@@ -385,6 +385,11 @@ def undo():
     ok = _manager.undo_last_action()
     if not ok:
         return jsonify({"error": "No hay acciones para deshacer"}), 400
+
+    if _manager.last_undo_source and _manager.last_undo_source.startswith("queue_"):
+        from src.routes.queue_routes import undo_last_queue_change
+        undo_last_queue_change()
+
     return jsonify({
         "tree": _tree_payload(),
         "stress_mode": _manager.tree.stress_mode,
